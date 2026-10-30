@@ -1,0 +1,12 @@
+node_modules
+.next
+.git
+coverage
+playwright-report
+test-results
+.env*
+!.env.example
+hub/dist
+!hub/dist/data
+hub/src/planner-projects.json
+docs

@@ -1,0 +1,228 @@
+@import "tailwindcss";
+
+/* ---------------------------------------------------------------------------
+   AECOM colour system - source: AECOM brand palette (Earth Green, Lime Green,
+   Midnight Teal, Coral Orange, Ocean Teal, Sunrise Yellow, Fuchsia Pink,
+   Stone Gray, Black) with the official 100/75/50/25 % tints.
+   Every colour in the application must come from this block. Change values
+   here only; components read the tokens. See docs/brand.md for usage rules.
+   --------------------------------------------------------------------------- */
+:root {
+  /* Earth Green - primary brand colour (header, navigation, primary actions) */
+  --earth-green: #008768;
+  --earth-green-75: #59a089;
+  --earth-green-50: #9bbeaf;
+  --earth-green-25: #cfdfd7;
+
+  /* Lime Green - highlight / secondary data series */
+  --lime-green: #aecc53;
+  --lime-green-75: #c5d984;
+  --lime-green-50: #d9e6b1;
+  --lime-green-25: #ecf3da;
+
+  /* Midnight Teal - dark accent, headings on light panels */
+  --midnight-teal: #00353e;
+  --midnight-teal-75: #00606a;
+  --midnight-teal-50: #5f909a;
+  --midnight-teal-25: #adc6cb;
+
+  /* Coral Orange - danger / rejected / validation */
+  --coral-orange: #e52713;
+  --coral-orange-75: #ec6642;
+  --coral-orange-50: #f49f7d;
+  --coral-orange-25: #fbd1be;
+
+  /* Ocean Teal - information */
+  --ocean-teal: #009a9b;
+  --ocean-teal-75: #00b2b4;
+  --ocean-teal-50: #88ccce;
+  --ocean-teal-25: #cae7e8;
+
+  /* Sunrise Yellow - warning / pending / current week */
+  --sunrise-yellow: #ffce00;
+  --sunrise-yellow-75: #ffd954;
+  --sunrise-yellow-50: #ffe696;
+  --sunrise-yellow-25: #fff3ce;
+
+  /* Fuchsia Pink - hyperlinks */
+  --fuchsia-pink: #c70c6f;
+  --fuchsia-pink-75: #d45e90;
+  --fuchsia-pink-50: #e199b6;
+  --fuchsia-pink-25: #f0cfdd;
+
+  /* Stone Gray - warm neutral surfaces */
+  --stone-gray: #dad8cc;
+  --stone-gray-75: #e4e2d8;
+  --stone-gray-50: #edece5;
+  --stone-gray-25: #f6f5f1;
+
+  /* Black and its tints - text and neutral UI */
+  --black: #000000;
+  --black-75: #646363;
+  --black-50: #9d9d9c;
+  --black-25: #d0d0d0;
+  --black-15: #e3e3e3;
+  --black-10: #ededed;
+  --black-5: #f6f6f6;
+  --white: #ffffff;
+
+  /* Semantic aliases used by components (keep names stable). */
+  --brand-primary: var(--earth-green);
+  --brand-primary-hover: var(--brand-green-deep);
+  --brand-black: var(--black);
+  --brand-white: var(--white);
+  --brand-green: var(--earth-green);
+  --brand-teal-dark: var(--midnight-teal);
+  --brand-green-light: var(--lime-green);
+  --brand-red: var(--coral-orange);
+  --brand-teal: var(--ocean-teal);
+  --brand-yellow: var(--sunrise-yellow);
+  --brand-amber: var(--sunrise-yellow);
+  --brand-magenta: var(--fuchsia-pink);
+  --brand-magenta-dark: #9c0880; /* followed hyperlink (template) */
+  --brand-slate: var(--black-75);
+
+  /* Derived shades (not in the palette): darker steps of the brand hues so
+     hover states and small text on white meet WCAG AA. Use only for that. */
+  --brand-green-deep: #006b52;
+  --brand-amber-deep: #7a5300;
+  --brand-red-deep: #b51d0d;
+
+  /* Neutral scale mapped to the Black tints; 600-900 are darker steps for text. */
+  --gray-50: var(--black-5);
+  --gray-100: var(--black-10);
+  --gray-200: var(--black-15);
+  --gray-300: var(--black-25);
+  --gray-400: var(--black-50);
+  --gray-500: var(--black-75);
+  --gray-600: #4f4e4e;
+  --gray-700: #3b3a3a;
+  --gray-800: #262626;
+  --gray-900: #121212;
+
+  --background: var(--white);
+  --foreground: var(--gray-900);
+  --surface: var(--white);
+  --surface-muted: var(--stone-gray-25);
+  --border: var(--gray-200);
+  --ring: var(--earth-green);
+}
+
+@theme inline {
+  --font-sans: Arial, "Helvetica Neue", Helvetica, "Segoe UI", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-border: var(--border);
+  --color-ring: var(--ring);
+
+  --color-brand-primary: var(--brand-primary);
+  --color-brand-primary-hover: var(--brand-primary-hover);
+  --color-brand-black: var(--brand-black);
+  --color-brand-white: var(--brand-white);
+  --color-brand-green: var(--brand-green);
+  --color-brand-green-light: var(--brand-green-light);
+  --color-brand-green-deep: var(--brand-green-deep);
+  --color-brand-teal: var(--brand-teal);
+  --color-brand-teal-dark: var(--brand-teal-dark);
+  --color-brand-yellow: var(--brand-yellow);
+  --color-brand-amber: var(--brand-amber);
+  --color-brand-amber-deep: var(--brand-amber-deep);
+  --color-brand-red: var(--brand-red);
+  --color-brand-red-deep: var(--brand-red-deep);
+  --color-brand-magenta: var(--brand-magenta);
+  --color-brand-magenta-dark: var(--brand-magenta-dark);
+  --color-brand-slate: var(--brand-slate);
+  --color-brand-link: var(--brand-magenta);
+
+  /* Full AECOM palette with tints, e.g. bg-earth-green, bg-earth-green-25 */
+  --color-earth-green: var(--earth-green);
+  --color-earth-green-75: var(--earth-green-75);
+  --color-earth-green-50: var(--earth-green-50);
+  --color-earth-green-25: var(--earth-green-25);
+  --color-lime-green: var(--lime-green);
+  --color-lime-green-75: var(--lime-green-75);
+  --color-lime-green-50: var(--lime-green-50);
+  --color-lime-green-25: var(--lime-green-25);
+  --color-midnight-teal: var(--midnight-teal);
+  --color-midnight-teal-75: var(--midnight-teal-75);
+  --color-midnight-teal-50: var(--midnight-teal-50);
+  --color-midnight-teal-25: var(--midnight-teal-25);
+  --color-coral-orange: var(--coral-orange);
+  --color-coral-orange-75: var(--coral-orange-75);
+  --color-coral-orange-50: var(--coral-orange-50);
+  --color-coral-orange-25: var(--coral-orange-25);
+  --color-ocean-teal: var(--ocean-teal);
+  --color-ocean-teal-75: var(--ocean-teal-75);
+  --color-ocean-teal-50: var(--ocean-teal-50);
+  --color-ocean-teal-25: var(--ocean-teal-25);
+  --color-sunrise-yellow: var(--sunrise-yellow);
+  --color-sunrise-yellow-75: var(--sunrise-yellow-75);
+  --color-sunrise-yellow-50: var(--sunrise-yellow-50);
+  --color-sunrise-yellow-25: var(--sunrise-yellow-25);
+  --color-fuchsia-pink: var(--fuchsia-pink);
+  --color-fuchsia-pink-75: var(--fuchsia-pink-75);
+  --color-fuchsia-pink-50: var(--fuchsia-pink-50);
+  --color-fuchsia-pink-25: var(--fuchsia-pink-25);
+  --color-stone-gray: var(--stone-gray);
+  --color-stone-gray-75: var(--stone-gray-75);
+  --color-stone-gray-50: var(--stone-gray-50);
+  --color-stone-gray-25: var(--stone-gray-25);
+  --color-black: var(--black);
+  --color-black-75: var(--black-75);
+  --color-black-50: var(--black-50);
+  --color-black-25: var(--black-25);
+  --color-black-15: var(--black-15);
+  --color-black-10: var(--black-10);
+  --color-black-5: var(--black-5);
+  --color-white: var(--white);
+
+  --color-gray-50: var(--gray-50);
+  --color-gray-100: var(--gray-100);
+  --color-gray-200: var(--gray-200);
+  --color-gray-300: var(--gray-300);
+  --color-gray-400: var(--gray-400);
+  --color-gray-500: var(--gray-500);
+  --color-gray-600: var(--gray-600);
+  --color-gray-700: var(--gray-700);
+  --color-gray-800: var(--gray-800);
+  --color-gray-900: var(--gray-900);
+
+  /* Semantic status colours (mapped to brand hues) */
+  --color-status-ok: var(--brand-green-deep);
+  --color-status-ok-bg: var(--earth-green-25);
+  --color-status-warn: var(--brand-amber-deep);
+  --color-status-warn-bg: var(--sunrise-yellow-25);
+  --color-status-danger: var(--brand-red-deep);
+  --color-status-danger-bg: var(--coral-orange-25);
+  --color-status-info: var(--brand-teal-dark);
+  --color-status-info-bg: var(--ocean-teal-25);
+  --color-status-neutral: var(--brand-slate);
+  --color-status-neutral-bg: var(--stone-gray-50);
+}
+
+html {
+  height: 100%;
+}
+
+body {
+  min-height: 100%;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Focus ring in Earth Green, visible on all interactive elements. */
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+/* Tabular figures for numbers in tables. */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
