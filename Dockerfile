@@ -15,7 +15,7 @@ ENV DATABASE_URL=postgres://build:build@127.0.0.1:1/build \
 RUN npm run build
 # Operational scripts (migrate, seed, demo accounts) bundled to plain Node so the runtime image
 # needs no dev dependencies.
-RUN node_modules/.bin/esbuild scripts/migrate.ts scripts/seed.ts scripts/demo-accounts.ts \
+RUN node_modules/.bin/esbuild scripts/migrate.ts scripts/seed.ts scripts/demo-accounts.ts scripts/ensure-db.ts \
       --bundle --platform=node --target=node22 --format=cjs --outdir=dist-scripts \
       --external:pg-native --log-level=warning
 

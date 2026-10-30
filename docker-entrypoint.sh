@@ -4,6 +4,11 @@
 # Hosted demos (Render) use this; an AECOM production rollout should run migrations as a
 # release step instead and leave SEED_* and DEMO_* unset.
 set -e
+if [ -n "$HUB_DATABASE_NAME" ]; then
+  echo "[start] shared instance mode: database $HUB_DATABASE_NAME"
+  DATABASE_URL=$(node dist-scripts/ensure-db.js)
+  export DATABASE_URL
+fi
 echo "[start] applying migrations"
 node dist-scripts/migrate.js
 if [ -n "$SEED_ADMIN_EMAIL" ] && [ -n "$SEED_ADMIN_PASSWORD" ]; then

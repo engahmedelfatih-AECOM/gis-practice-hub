@@ -9,10 +9,16 @@ services:
     branch: main
     healthCheckPath: /api/health
     envVars:
+      # Own database (paid plan or a second workspace), or the shared-instance mode below.
       - key: DATABASE_URL
         fromDatabase:
           name: gis-practice-hub-db
           property: connectionString
+      # Shared-instance mode (Render free tier allows one free PostgreSQL per workspace): point
+      # DATABASE_URL at the Resource Planner database instead and set HUB_DATABASE_NAME; the Hub
+      # creates its own database on that instance at first start. Data stays separate.
+      # - key: HUB_DATABASE_NAME
+      #   value: gis_practice_hub
       - key: APP_URL
         value: https://gis-practice-hub.onrender.com
       - key: BETTER_AUTH_URL

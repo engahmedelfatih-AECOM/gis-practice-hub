@@ -11,6 +11,11 @@
   (demonstration only), `LOG_LEVEL`. Optional: `MS_TENANT_ID`, `MS_CLIENT_ID`, `MS_CLIENT_SECRET`
   for Microsoft sign-in, `JOB_TOKEN` for scheduled calls, `MAP_ORIGINS` to allow other tile hosts.
 - The container entrypoint runs the migrations and the seed on every start (both idempotent).
+- Shared-instance mode: the Render free tier allows one free PostgreSQL per workspace. Set
+  `DATABASE_URL` to the Resource Planner database (internal connection string) and
+  `HUB_DATABASE_NAME=gis_practice_hub`; at first start the Hub creates its own database on that
+  instance and uses it from then on. Move to its own instance by setting `DATABASE_URL` to the
+  new database and removing `HUB_DATABASE_NAME`.
 - Health: `GET /api/health`.
 
 ## 2. First setup
