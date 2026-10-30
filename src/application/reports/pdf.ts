@@ -28,7 +28,7 @@ export class PdfReport {
     r.bold = await r.doc.embedFont(StandardFonts.HelveticaBold);
     r.footer = footer;
     r.doc.setTitle(footer);
-    r.doc.setProducer("AECOM Resource Planner");
+    r.doc.setProducer("AECOM GIS Practice Hub");
     r.newPage();
     return r;
   }

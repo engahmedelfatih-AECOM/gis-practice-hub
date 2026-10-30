@@ -35,7 +35,7 @@ export const TONE_FILL: Record<string, string | null> = {
 
 export const FONT = "Arial";
 
-export function newWorkbook(creator = "AECOM Resource Planner"): ExcelJS.Workbook {
+export function newWorkbook(creator = "AECOM GIS Practice Hub"): ExcelJS.Workbook {
   const wb = new ExcelJS.Workbook();
   wb.creator = creator;
   wb.created = new Date();
