@@ -73,6 +73,10 @@ export const project = pgTable(
     stageStates: jsonb().$type<Record<string, string>>().notNull().default({}),
     qaqcChecklistUrl: text(),
     rfiLogUrl: text(),
+    /** Client comment (CRS) counters typed on the register: open, in review, closed. */
+    crsOpen: integer().notNull().default(0),
+    crsInReview: integer().notNull().default(0),
+    crsClosed: integer().notNull().default(0),
     milestoneOverride: text(),
     lastUpdated: date(),
     remarks: text(),

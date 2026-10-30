@@ -1,5 +1,5 @@
 {
-  "id": "491637e9-8f7b-4bd3-b31a-3dad5dcc50a8",
+  "id": "6c13a182-ea75-46d0-b1e5-b77e2c34bd64",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -2246,6 +2246,27 @@
           "type": "text",
           "primaryKey": false,
           "notNull": false
+        },
+        "crs_open": {
+          "name": "crs_open",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "crs_in_review": {
+          "name": "crs_in_review",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "crs_closed": {
+          "name": "crs_closed",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
         },
         "milestone_override": {
           "name": "milestone_override",
