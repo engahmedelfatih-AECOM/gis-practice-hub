@@ -10,6 +10,14 @@ checked against GitHub, Render and ArcGIS Online, and sections 15 to 21 were add
 context, permission matrices, diagram, bundled files, Project instructions, first-session prompt,
 completeness check).
 
+Revision 2 on 2026-11-02 (first session of the P10 Project thread "Continue Resource Planner and
+Hub handover"): open PRs, Render deploys and the database re-read through GitHub and the Render
+connector (read-only); heads now `split-planner` 0c05766 and `gis-practice-hub` main ac78a89 (both
+handover doc commits only after dae1498 and 13d9a35); contradictions corrected in sections 2, 7, 9
+and 10; the planner admin e-mail is still unresolved (section 10); database decision pending
+(section 10 and `09_Systems_Development/03_Shared/04_Database/DB_Expiry_Options_resource-planner-db.md`
+in the Project files).
+
 Owner: Ahmed Elfatih, GIS Manager, AECOM Middle East GIS Practice (work e-mail
 ahmed.elfatih@aecom.com; GitHub organisation account engahmedelfatih-AECOM).
 
@@ -56,25 +64,25 @@ ahmed.elfatih@aecom.com; GitHub organisation account engahmedelfatih-AECOM).
 | Item | GIS Resource Planner | GIS Practice Hub |
 | --- | --- | --- |
 | GitHub | `engahmedelfatih-AECOM/resource-planner` | `engahmedelfatih-AECOM/gis-practice-hub` |
-| Default branch | `main` (head 0a05572, merge of hub-phase-a) | `main` (head 13d9a35) |
-| Work branch | `split-planner` (head dae1498, PR #8 open to main) | none, work on main |
+| Default branch | `main` (head 0a05572, merge of hub-phase-a) | `main` (head ac78a89 on 2026-11-02; last code commit 13d9a35) |
+| Work branch | `split-planner` (head 0c05766 on 2026-11-02; last code commit dae1498; PR #8 open to main) | none, work on main |
 | Local checkout in the building session | `/home/user/resource-planner` | `/home/user/gis-practice-hub` |
-| Project rules file | `CLAUDE.md`, plus `AGENTS.md` (Next.js 16 notes) | `CLAUDE.md` |
+| Project rules file | `CLAUDE.md` (no `AGENTS.md` on `main` or `split-planner`, checked 2026-11-02) | `CLAUDE.md` |
 | Render service | `resource-planner`, id `srv-dbbmnsrncjis7398i680`, Frankfurt, free plan, Docker, auto-deploy on commit from `main` (confirmed through the Render connector on 2026-11-02) | `gis-practice-hub`, id `srv-dbihdu08v5cc73a9lmt0`, Frankfurt, free plan, Docker, auto-deploy from `main` |
 | Render URL | https://resource-planner-minr.onrender.com | https://gis-practice-hub.onrender.com |
 | Render database | `resource-planner-db`, id `dpg-dbbmmi0ae00c739b8bb0-a`, PostgreSQL 16, free plan, database name `resource_planner_db_f0ff`, expires 2026-11-19 | none of its own: database `gis_practice_hub` created on the `resource-planner-db` instance (shared-instance mode, see 2.4) |
 | Render workspace | "Ahmed Workspase" (sic), id `tea-daki00142hec73al8o90` | same |
 | CI | GitHub Actions `.github/workflows/ci.yml` | GitHub Actions `.github/workflows/ci.yml` |
 
-Open pull requests on `resource-planner`, confirmed through the GitHub REST API on 2026-11-02
-(`gis-practice-hub` has none):
+Open pull requests on `resource-planner`, confirmed through the GitHub API on 2026-11-02 and
+re-checked in revision 2 (`gis-practice-hub` has none, open or closed):
 
 | PR | Branch | Content | Action |
 | --- | --- | --- | --- |
 | #2, #3, #4, #5 | hub-phase-b to hub-phase-e (stacked) | Hub inside the planner | Superseded by #8, which contains their history. Close after #8 merges. |
 | #6 | claude/project-thread-8f1nft -> hub-phase-e | Portal push hardening: retries, partial failures, mapping edge cases | Obsolete (portal push retired). Close. |
-| #7 | brand-standards | `standards/templates` folder: AECOM_PPT_Template.pptx, logo variants, brand standards | Still wanted. A `git merge-tree` test on 2026-11-02 showed it merges cleanly onto `split-planner`; merge after #8. |
-| #8 | split-planner | Remove Hub from the planner, wordmark, public holidays, data wipe script, docs, ADR-008 | Merge first. CI was green at dae1498. |
+| #7 | brand-standards | `standards/templates` folder: AECOM_PPT_Template.pptx, logo variants, brand standards | Still wanted. `git merge-tree` re-run in revision 2 against `split-planner` 0c05766: no conflicts; merge after #8. |
+| #8 | split-planner | Remove Hub from the planner, wordmark, public holidays, data wipe script, docs, ADR-008 | Merge first. At 0c05766 the CI job `verify` passed (2026-11-02 08:07 UTC); the `docker` job was still queued, so GitHub showed `unstable`. Confirm both green before merging. |
 
 ### 2.2 Stack (identical in both unless noted)
 
@@ -396,7 +404,7 @@ dropdown behaviour, formulas) follows the workbook.
 - Both repositories have a `CLAUDE.md` with the working rules (AECOM colours only from the tokens,
   Arial, wordmark not logo, never a long dash, client data stays on AECOM systems, no secrets in
   files, ESLint layer boundaries; the Hub adds "the workbook is the specification" and browser date
-  pickers everywhere). The planner also has `AGENTS.md` with Next.js 16 guidance.
+  pickers everywhere). Revision 2: no `AGENTS.md` exists in the planner (`main` or `split-planner`).
 - Neither repository has a `.claude/` folder (no project settings, hooks, skills or agents). The
   building session ran in the claude.ai cloud environment with the repositories attached; MCP
   servers came from claude.ai connectors, not from a project `.mcp.json`.
@@ -434,6 +442,8 @@ dropdown behaviour, formulas) follows the workbook.
 | 2026-10-30 | Shared-instance database mode for the Hub on Render | Free tier allows one free Postgres per workspace |
 | 2026-10-31 | `AECOM_PPT_Template.pptx` is the standard for future decks | Owner's instruction |
 | 2026-11-01 | Admin account must use ahmed.elfatih@aecom.com; the Gmail seeded account is to be replaced | Corporate identity |
+| 2026-11-02 | Work continues in the P10 Project thread "Continue Resource Planner and Hub handover"; this file stays the state of record | Owner's instruction |
+| 2026-11-02 | No merge of PR #8, no data wipe and no database change until the owner gives an explicit go | Owner's instruction |
 
 ---
 
@@ -442,9 +452,14 @@ dropdown behaviour, formulas) follows the workbook.
 Planner:
 
 - Merge PR #8 (`split-planner`) into `main`; then close PRs #2 to #6; rebase and merge PR #7.
-- After the merge deploys, run `npm run db:wipe -- --yes` against the planner Render database
-  (through a Render shell or a one-off job) to remove the sample project data. Migration 0010
-  drops the hub tables automatically on deploy.
+- After the merge deploys, run `npm run db:wipe -- --yes` against the planner Render database to
+  remove the sample project data. Migration 0010 drops the hub tables automatically on deploy.
+  Revision 2 correction: it cannot run through a Render Shell or one-off job, because the free
+  service has no Shell or jobs, the Docker image bundles only migrate, seed, demo-accounts and
+  `tsx` is a dev dependency. Run it from a PC checkout of `main` (`npm ci`) with `DATABASE_URL` set
+  in the shell (not in a file) to the External Database URL of `resource-planner-db` plus
+  `?sslmode=require`, after adding the PC's IP to the database allow list (empty today); pg_dump
+  first; remove the IP afterwards.
 - Planner to Hub API link keyed by project number (planner owns the project record, hub reports
   delivery status); the hub's Resources register then reads planner allocations.
 - Create the AECOM admin user, disable demo accounts, deactivate the Gmail admin (same as the hub).
@@ -485,11 +500,32 @@ Both:
   `gis_practice_hub`. Options before that date: upgrade the instance to a paid plan in the Render
   dashboard (keeps data and connection string), or `pg_dump` both databases and restore them on
   new instances, then update `DATABASE_URL` on both services. No backups exist today.
+  Revision 2: expiry re-read 2026-11-19T13:23:20Z; plan free; IP allow list empty, so any pg_dump
+  or external script first needs an IP added in the dashboard; a second free instance is refused
+  while this one exists and a new free instance expires again 30 days after creation, so
+  dump-and-recreate on the free plan only buys 30 days. Steps and risks of both options:
+  `DB_Expiry_Options_resource-planner-db.md` (Project files, 03_Shared/04_Database). Recommended:
+  upgrade to the smallest paid type before 2026-11-17, with a one-off pg_dump first. Decision
+  pending with the owner.
 - Hub admin seeded with engahmedelfatih@gmail.com because `SEED_ADMIN_EMAIL` was changed after the
   first boot; the seed only runs when no user exists. Fix by creating the AECOM user in-app (see
   section 9). The planner was seeded on 2026-10-20 with the `SEED_ADMIN_EMAIL` set at that time;
   Render logs no longer cover that day, so confirm the address in the planner under
   Administration > Users and apply the same fix [VERIFY planner admin e-mail].
+  Revision 2: still unresolved. The earliest planner app log the Render connector returns is from
+  2026-10-26 ("Users already exist (7)"), so the seed line of 2026-10-20 is gone, and the database
+  cannot be queried (empty IP allow list; also out of scope without the owner's go). The owner
+  reads it in the planner under Administration > Users (`/admin/users`) or Administration > Audit
+  (`/admin/audit`, action `system.seedAdministrator`). The planner has 7 users: the admin, four
+  demo accounts (director, teamlead, pm, management `.demo@aecom.com`) and two others.
+- Hub user count rose from 5 to 6 between 2026-10-30 22:44 and 2026-10-31 18:51 UTC (Render logs):
+  one user was created in-app after first boot. The owner confirmed on 2026-11-02 that it is
+  ahmed.elfatih@aecom.com with the GIS_SPECIALIST role only; setup step 3 grants ADMINISTRATOR and
+  GIS_MANAGER (Global) and revokes GIS_SPECIALIST (owner's setup in progress, steps in the Project
+  files, 02_GIS_Practice_Hub/05_User_Guides_and_Training/Hub_First_Setup_Steps.md).
+- Demo account scripts (both apps) reset the demo passwords and re-grant missing roles on every
+  start while `DEMO_ACCOUNTS_PASSWORD` is set, but they do not re-activate a deactivated account.
+  Deactivate the demo users in-app and remove the variable on Render.
 - Render free services spin down after inactivity; the first request takes about a minute.
 - Hub database lives on the planner's free PostgreSQL instance (shared-instance mode), so the
   expiry above affects both applications at once. `pg_dump` before bulk imports.
@@ -1075,10 +1111,10 @@ each one rests on and what still carries a [VERIFY] marker.
 | 4 Features planner | route folders, nav, scripts, docs, Render deploy list | high | none |
 | 5 Features hub | route folders, registers.ts, rules.ts, import.ts, docs, Render logs of first boot | high | none |
 | 6 Connectors and integrations | session history, env names, code, ArcGIS Online group search | high | none (no portal group exists) |
-| 7 Claude Code setup | repository inventory (no .claude folders), session conventions | high | none |
+| 7 Claude Code setup | repository inventory (no .claude folders, no AGENTS.md), session conventions | high | none |
 | 8 Decision log | session history | medium (dates accurate to the day) | none |
 | 9 Decided but not yet built | session history, owner confirmations | high | none |
-| 10 Known issues | Render connector (database expiry), session history | high | planner seeded admin e-mail (Render logs no longer cover 2026-10-20) |
+| 10 Known issues | Render connector (database expiry, allow list, logs), code of the seed, demo and wipe scripts | high | planner seeded admin e-mail (logs start 2026-10-26; owner to read it in /admin/users) |
 | 11 Roadmap | session history, owner's plan | medium | none |
 | 12 Open questions | session history | n/a | none |
 | 13 Quick-start | repository READMEs and runbooks | high | none |
@@ -1097,7 +1133,8 @@ concretely; the Hub is described as a separate application, with its earlier lif
 module recorded in sections 1, 4 and 8 and in the planner commit history.
 
 What a fresh instance should still do first: the two-point list in section 20 (planner admin
-e-mail; the 2026-11-19 database expiry), then PR #8.
+e-mail; the 2026-11-19 database expiry), then PR #8. Revision 2: the Render connector needs the
+workspace id `tea-daki00142hec73al8o90` passed on each call (no workspace is pre-selected).
 
 Where this file lives: `resource-planner` on branch `split-planner` (reaches `main` with PR #8) and
 `gis-practice-hub` on `main`, both at the repository root as
