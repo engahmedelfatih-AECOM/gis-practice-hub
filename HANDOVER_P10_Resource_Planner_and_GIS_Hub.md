@@ -5,7 +5,10 @@ checked-out repositories (`resource-planner` on branch `split-planner` at dae149
 on branch `main` at 13d9a35), the Render dashboard as read through the Render connector, and the
 conversation history of the building session. Anything not confirmed from one of those sources is
 marked [VERIFY]. No secret appears in this file; every credential is referenced by its environment
-variable name only.
+variable name only. Revised the same day after a review of the first version: open items were
+checked against GitHub, Render and ArcGIS Online, and sections 15 to 21 were added (business
+context, permission matrices, diagram, bundled files, Project instructions, first-session prompt,
+completeness check).
 
 Owner: Ahmed Elfatih, GIS Manager, AECOM Middle East GIS Practice (work e-mail
 ahmed.elfatih@aecom.com; GitHub organisation account engahmedelfatih-AECOM).
@@ -36,6 +39,10 @@ ahmed.elfatih@aecom.com; GitHub organisation account engahmedelfatih-AECOM).
   80 bi-weekly report periods loaded, demo accounts created, no workbook imported yet. Planner
   demo is live on Render from `main`, which still contains Hub Phase A code and tables until PR #8
   is merged and the data wipe is run.
+- **Critical date: 2026-11-19.** The only Render database (`resource-planner-db`, free plan) expires
+  on 2026-11-19 at 13:23 UTC (`expiresAt` read from the Render connector). Both applications use
+  it. Upgrade it to a paid plan, or export and recreate, before that date, or both demos lose
+  their data. See section 10.
 - The Excel workbooks (`GIS_Practice_Hub_v5.xlsx`, delivered to the team as `GIS_Practice_Hub.xlsx`,
   and `QIC_Master_Tracker_AECOM.xlsx`) remain the team's working tools and the specification of the
   Hub. The working standard GIS-STD-001 (Word, PowerPoint, Markdown) describes who fills what.
@@ -55,18 +62,18 @@ ahmed.elfatih@aecom.com; GitHub organisation account engahmedelfatih-AECOM).
 | Project rules file | `CLAUDE.md`, plus `AGENTS.md` (Next.js 16 notes) | `CLAUDE.md` |
 | Render service | `resource-planner`, id `srv-dbbmnsrncjis7398i680`, Frankfurt, free plan, Docker, auto-deploy on commit from `main` (confirmed through the Render connector on 2026-11-02) | `gis-practice-hub`, id `srv-dbihdu08v5cc73a9lmt0`, Frankfurt, free plan, Docker, auto-deploy from `main` |
 | Render URL | https://resource-planner-minr.onrender.com | https://gis-practice-hub.onrender.com |
-| Render database | `resource-planner-db`, id `dpg-dbbmmi0ae00c739b8bb0-a`, PostgreSQL 16, free plan | none of its own: database `gis_practice_hub` created on the `resource-planner-db` instance (shared-instance mode, see 2.4) |
+| Render database | `resource-planner-db`, id `dpg-dbbmmi0ae00c739b8bb0-a`, PostgreSQL 16, free plan, database name `resource_planner_db_f0ff`, expires 2026-11-19 | none of its own: database `gis_practice_hub` created on the `resource-planner-db` instance (shared-instance mode, see 2.4) |
 | Render workspace | "Ahmed Workspase" (sic), id `tea-daki00142hec73al8o90` | same |
 | CI | GitHub Actions `.github/workflows/ci.yml` | GitHub Actions `.github/workflows/ci.yml` |
 
-Open pull requests on `resource-planner` (as last seen; `gh pr list` could not be re-run from the
-handover session, so [VERIFY]):
+Open pull requests on `resource-planner`, confirmed through the GitHub REST API on 2026-11-02
+(`gis-practice-hub` has none):
 
 | PR | Branch | Content | Action |
 | --- | --- | --- | --- |
 | #2, #3, #4, #5 | hub-phase-b to hub-phase-e (stacked) | Hub inside the planner | Superseded by #8, which contains their history. Close after #8 merges. |
-| #6 | portal push hardening | ArcGIS Portal push job hardening | Obsolete (portal push retired). Close. |
-| #7 | brand-standards | `standards/templates` folder: AECOM_PPT_Template.pptx, logo variants, brand standards | Still wanted. Rebase on main after #8 and merge [VERIFY conflicts]. |
+| #6 | claude/project-thread-8f1nft -> hub-phase-e | Portal push hardening: retries, partial failures, mapping edge cases | Obsolete (portal push retired). Close. |
+| #7 | brand-standards | `standards/templates` folder: AECOM_PPT_Template.pptx, logo variants, brand standards | Still wanted. A `git merge-tree` test on 2026-11-02 showed it merges cleanly onto `split-planner`; merge after #8. |
 | #8 | split-planner | Remove Hub from the planner, wordmark, public holidays, data wipe script, docs, ADR-008 | Merge first. CI was green at dae1498. |
 
 ### 2.2 Stack (identical in both unless noted)
@@ -293,7 +300,8 @@ Routes under `src/app/(app)` (after PR #8):
 What `main` still has that `split-planner` removes: the Hub Phase A module (hub registers inside
 the planner, migration 0005 tables), the bundled hub register data shipped in the Docker image
 (commit 152f23d), the AECOM Portal connector pieces. The Render planner service currently runs
-`main` (0a05572), so the live demo still shows Hub Phase A screens [VERIFY by opening the demo].
+`main`: the Render connector lists the live deploy `dep-dbcfgpmq1p3s73av9erg` built from commit
+0a05572 on 2026-10-21, so the live planner demo still shows the Hub Phase A screens.
 
 ---
 
@@ -361,8 +369,10 @@ dropdown behaviour, formulas) follows the workbook.
   the cloud session; pushes go through the session's git proxy. Repository creation by API was
   blocked by the permission classifier, so the owner created `gis-practice-hub` in the GitHub UI.
 - **ArcGIS Online** (connector "Ahmed_Elfatih_Oline_GIS", AECOM ArcGIS Online organisation): used
-  in the earlier phase to search content and to plan portal items for the hub (group "AECOM ME GIS
-  Practice Hub" [VERIFY whether created]). The planner's local "aecom-portal" MCP connector with
+  in the earlier phase to search content and to plan portal items for the hub. A group search on
+  2026-11-02 found no group named "AECOM ME GIS Practice Hub" in the organisation (only an
+  unrelated public group "GIS Practice Hub Site Content" owned by another organisation), so
+  nothing was provisioned on ArcGIS Online. The planner's local "aecom-portal" MCP connector with
   `provision_hub`, `sync_planner_to_hub` and `publish_survey` tools (commit 5f0acc6) was retired
   in Phase E (5b19bf6) and removed in the split (no `connectors/` folder and no `provision_hub`
   reference remain on `split-planner`).
@@ -447,7 +457,8 @@ Hub:
 - Import `GIS_Practice_Hub.xlsx` (dry run first) and the client Master Tracker(s); add latitude and
   longitude on projects for the map; set `planner.url` in Settings.
 - Disable or remove the four demo accounts before anyone outside the team sees the demo.
-- Paid PostgreSQL of its own (or a second workspace) and removal of `HUB_DATABASE_NAME`.
+- Paid PostgreSQL of its own (or a second workspace) and removal of `HUB_DATABASE_NAME`. Until
+  then the shared instance must be upgraded before 2026-11-19.
 - Check that OpenStreetMap tiles load from the AECOM network; otherwise set `map.styleUrl` to an
   approved tile service and add its host to `MAP_ORIGINS`.
 - Resources register fed from the planner API (manual until then).
@@ -469,17 +480,23 @@ Both:
 
 ## 10. Known issues
 
+- **Database expiry 2026-11-19.** `resource-planner-db` is a free Render PostgreSQL with
+  `expiresAt` 2026-11-19T13:23Z. It holds the planner database and the Hub database
+  `gis_practice_hub`. Options before that date: upgrade the instance to a paid plan in the Render
+  dashboard (keeps data and connection string), or `pg_dump` both databases and restore them on
+  new instances, then update `DATABASE_URL` on both services. No backups exist today.
 - Hub admin seeded with engahmedelfatih@gmail.com because `SEED_ADMIN_EMAIL` was changed after the
   first boot; the seed only runs when no user exists. Fix by creating the AECOM user in-app (see
-  section 9). The same applies to the planner seed [VERIFY planner admin e-mail].
+  section 9). The planner was seeded on 2026-10-20 with the `SEED_ADMIN_EMAIL` set at that time;
+  Render logs no longer cover that day, so confirm the address in the planner under
+  Administration > Users and apply the same fix [VERIFY planner admin e-mail].
 - Render free services spin down after inactivity; the first request takes about a minute.
-- Hub database lives on the planner's free PostgreSQL instance (shared-instance mode); the free
-  instance has Render's 90-day expiry for free databases [VERIFY current Render policy] and no
-  backups. `pg_dump` before bulk imports.
+- Hub database lives on the planner's free PostgreSQL instance (shared-instance mode), so the
+  expiry above affects both applications at once. `pg_dump` before bulk imports.
 - Planner `main` still contains Hub Phase A; the live planner demo shows hub screens until PR #8
   is merged. The planner Render database still holds sample planning data until `db:wipe` runs.
-- The planner `/api/hub/v1/*` feed was written for the in-planner hub and may need renaming or
-  re-scoping when the planner to hub link is designed [VERIFY after PR #8].
+- The planner `/api/hub/v1/*` feed was written for the in-planner hub and will need renaming or
+  re-scoping when the planner to hub link is designed (open question in section 12).
 - `onrender.com` is not reachable from the Claude cloud sandbox; verify deploys through the Render
   connector logs or from a browser.
 - First Hub Docker builds failed because `public/` was empty and untracked; fixed by
@@ -500,27 +517,28 @@ Both:
 
 Near term (next two to four weeks):
 
-1. Merge PR #8, close superseded PRs, merge PR #7, run the planner data wipe.
-2. Hub first setup by the owner: AECOM admin user, workbook import, client trackers, map
+1. Before 2026-11-19: secure the Render database (upgrade or dump and recreate).
+2. Merge PR #8, close superseded PRs, merge PR #7, run the planner data wipe.
+3. Hub first setup by the owner: AECOM admin user, workbook import, client trackers, map
    coordinates, settings, disable demo accounts.
-3. Team onboarding on the Excel workbooks and the working standard GIS-STD-001; Friday meeting;
+4. Team onboarding on the Excel workbooks and the working standard GIS-STD-001; Friday meeting;
    shared folder structure (project folders, Outgoing, Internal QA/QC with the master checklist).
-4. Collect feedback from the first two bi-weekly cycles and adjust the Hub registers.
+5. Collect feedback from the first two bi-weekly cycles and adjust the Hub registers.
 
 Mid term:
 
-5. Planner to Hub link by project number (API keys exist on both sides); Hub Resources from
+6. Planner to Hub link by project number (API keys exist on both sides); Hub Resources from
    planner allocations; planner shows delivery status from the Hub.
-6. Entra ID sign-in on both; retire local passwords.
-7. Move hosting to AECOM infrastructure; secrets in Key Vault; backups; a paid PostgreSQL per app
+7. Entra ID sign-in on both; retire local passwords.
+8. Move hosting to AECOM infrastructure; secrets in Key Vault; backups; a paid PostgreSQL per app
    until then if the demos stay on Render.
-8. Notifications and the bi-weekly digest e-mail (planner outbox exists), document register.
+9. Notifications and the bi-weekly digest e-mail (planner outbox exists), document register.
 
 Longer term:
 
-9. Desktop and script tools under 09_Systems_Development (ArcGIS Pro toolboxes, QA scripts
+10. Desktop and script tools under 09_Systems_Development (ArcGIS Pro toolboxes, QA scripts
    reading the Hub API).
-10. Management dashboards combining planner cost and hub delivery.
+11. Management dashboards combining planner cost and hub delivery.
 
 ---
 
@@ -632,8 +650,10 @@ Uploaded by the owner (inputs): `GIS_Hub_in_Resource_Planner_BUILD_SPEC.md`,
 Proposal Cost Calculator workbooks (Red Sea, TASREEF), `AECOM_PPT_Template.pptx`,
 `AECOM_Blank.docx`, `Portal_Connection.zip`, `GIS_Hub_Macros.bas`.
 
-Produced in the building session and sent to the owner (not in git; copies should be filed under
-09_Systems_Development):
+Produced in the building session and sent to the owner. The Markdown and script deliverables and
+the Hub screenshots are now committed under `docs/handover/` in `gis-practice-hub` (section 18);
+the binary deliverables (docx, pptx, xlsx) exist only in the copies sent to the owner and should
+be filed under 09_Systems_Development:
 
 - Workbooks: `GIS_Practice_Hub_v3.xlsx`, `GIS_Practice_Hub_v4.xlsm` (rejected), `GIS_Practice_Hub_v5.xlsx`
   (the current team workbook), `QIC_Master_Tracker_AECOM.xlsx`, and their Python builders
@@ -664,39 +684,394 @@ Hub: `src/domain/hub/registers.ts`, `src/domain/hub/rules.ts`, `src/domain/hub/s
 
 ---
 
-## 15. Completeness check
+## 15. Business context and team process
 
-Re-read on 2026-11-02 after writing. Each required section is present; the table says what each
-one rests on and what still carries a [VERIFY] marker.
+The applications serve the AECOM Middle East GIS Practice, part of Digital Delivery. The GIS
+Manager (Ahmed Elfatih, Dubai) runs the practice; the delivery teams sit in Dubai and in the
+Enterprise Capabilities (EC) centres in India, Romania and South Africa. Everything below is
+encoded in the Hub seed lists (`src/domain/hub/seed-lists.ts`) and in the working standard
+GIS-STD-001 (`docs/handover/GIS-STD-001_Working_Standard.md` in the Hub repository).
+
+### 15.1 Regions, leads and roles
+
+| Region (list `region`) | GIS Lead (list `gisLead`) |
+| --- | --- |
+| Dubai | Safa Hamed |
+| India | Arun Belanke |
+| Romania | Liliana Ignat |
+| South Africa | Busisiwe Roberts |
+| Mix EC Resources | calculated value when a project uses more than one EC hub |
+
+GIS roles (list `gisRole`): GIS Manager, GIS Lead, Principal GIS Specialist, Senior GIS
+Specialist, GIS Specialist, GIS Developer, GIS Technician, GIS Administrator, GIS QA/QC Reviewer.
+
+Who does what (GIS-STD-001 section 3):
+
+- GIS Manager: owns both workbooks, the Lists and the period calendar; creates every project and
+  its update sheet; agrees and records the stage gate dates; assigns the GIS Lead after the green
+  light in the resource planning meeting; runs the weekly progress meeting; keeps the client Master
+  Trackers current with the GIS Specialist.
+- GIS Lead: coordinates the assigned resources; plans the Packages (one row per discipline per
+  design stage, dates in line with the deployment plan); enters Resources and utilisation; owns
+  package status, submissions, client review status, revisions; signs off QA/QC before every
+  submission; writes the three Updates blocks before the bi-weekly meeting; raises Risks.
+- GIS Specialist: collects design data (from disciplines, ACC or the project share folder); sets up
+  and maintains the Schema Tracker rows (feature classes, geometry, status, source file link, share
+  folder link); updates the client Master Tracker dictionary, subtypes and domains; updates GIS
+  start, progress % and remarks on Packages up to Internal QA/QC; raises RFIs and Risks.
+- Risks may be raised by anyone. Project Managers and discipline leads provide stage gate dates,
+  design data (Code B) and RFI answers; the client provides schema, data dictionary, CRS comments
+  and approvals.
+
+RACI per register (GIS-STD-001 section 3.5): Projects R/A Manager; Packages planning A Manager,
+R Lead; Packages progress A Lead, R Specialist; Resources A Manager, R Lead; Schema Tracker A Lead,
+R Specialist; Master Tracker A Manager, R Specialist; QAQC R/A Lead; RFI Log A Lead, R Specialist;
+Updates A Manager, R Lead; Risks A Manager, R Lead and Specialist; Dashboard, Delivery Tracker,
+Lists and Standards R/A Manager. The Hub permission matrix in section 16 encodes this.
+
+### 15.2 Reporting cadence
+
+- Weekly progress meeting held by the GIS Manager. Each region reports every two weeks, so two
+  regions are on the agenda each week (example rotation: week A India and South Africa, week B
+  Romania and Dubai).
+- The reporting period of a region is the two weeks ending before its meeting. In Updates, Meeting
+  Date, Period From and Period To are typed; Report Period and the standard bi-weekly bucket are
+  derived (`periodLabel`, `periodBucket`). The standard calendar starts 2026-09-28 (editable in
+  Administration > Report periods), 80 periods of 14 days.
+- The meeting works from the project update page and its three blocks: Accomplishment / Progress,
+  Priorities / Planned (Next 2 Weeks), Concerns and Mitigations. One line per item with stage,
+  discipline, date, owner. Concerns needing management support also become Risks rows.
+- Preparation: specialists update Packages, Schema Tracker and RFI Log two working days before;
+  leads write Updates, Resources and Risks one working day before; the manager sets the Dashboard
+  period and checks the update pages on the day.
+- Team meeting: Friday. The resource planning meeting continues separately. Urgent coordination is
+  unchanged (direct).
+- Shared folder convention announced to the team: one GIS folder structure per project in the
+  shared folder, an Outgoing folder for submissions, an Internal QA/QC folder holding the master
+  QA/QC checklist; the master QA/QC protocol and checklist were attached to the team e-mail. Every
+  row in the delivered workbooks is sample data, to be replaced by the team.
+
+### 15.3 Delivery vocabulary
+
+- Design stages (list `designStage`): MP Masterplan, PC Pre-Concept, CD Concept Design, SD
+  Schematic Design, DD Detailed Design, PFD Pre-Final Design, FD Final / Tender Design, IFC Issued
+  for Construction, plus CD and DD percentage milestones (30, 50, 70, 90). The project stage chips
+  in the Hub use MP, CP, SD, DD, CD, IFC (`DESIGN_STAGE_CODES`).
+- Project status: Not Started, Progressing, At Risk, On Hold, Completed.
+- Package status: Not Started, In Progress, Internal QA/QC, Submitted, Client Comments,
+  Resubmitted, Approved, On Hold, Cancelled. Delivered text = Submitted, Resubmitted, Approved.
+- Client review status: Pending Submission, Under Review, Comments Issued, Re-Submission Required,
+  Approved in Principle, Approved. Revisions R0 to R5. Dimension 2D, 3D, 2D & 3D.
+- Schema status: Not Started, In Progress, Delivered, Approved, N/A. Geometry: Point, Polyline,
+  Polygon, Tabular, Annotation, Raster.
+- Disciplines are grouped Infrastructure (23 values such as Roads & Highways, Stormwater Drainage,
+  Potable Water, Power / Electrical (MV/LV), Telecom / ICT), Masterplan (4) and Urban Planning
+  (U+P) (7); "All Infrastructure Disciplines" is a group-level value.
+- Default delivery workflow (12 steps shown at the foot of the update page): GIS Requirements (RFP /
+  Client Standards); GIS Execution Plan & CRS Agreed; Approved Design Data (Code B); CAD / BIM Data
+  Cleaning; Schema Mapping & Conversion; Attribute Gaps / RFIs Issued; QA/QC (Self-check +
+  Independent); GIS Submission; Client Review (CRS Comments); Comments Closure & Resubmission;
+  Client Approval; Portal Publishing / Handover.
+- Abbreviations: CRS = client comment review sheet; Code B = design data approved for use; ACC =
+  Autodesk Construction Cloud; EC = Enterprise Capabilities centre; RFI = request for information;
+  QIC, RSG (Red Sea Global, Laheq Island), Soudah Development and TASREEF are the clients and
+  projects used as sample data in the workbooks and calculator checks. Client data must stay on
+  AECOM systems.
+
+### 15.4 Planner vocabulary
+
+- Planner roles map to the practice as follows: DISCIPLINE_DIRECTOR = the GIS Manager (approves
+  allocations, decides requests, manages budgets and bids); TEAM_LEAD = regional GIS Lead (manages
+  allocations, leave and actuals for the team); PROJECT_MANAGER = AECOM project manager (project
+  scoped reading and planning, raises resource requests); MEMBER = GIS staff (own hours); MANAGEMENT
+  = cost visibility; ADMINISTRATOR = system; VIEWER = read only.
+- Capacity: 195 hours per month over 22 working days (8.86 hours per day) in the calculator;
+  the capacity engine uses working patterns, public holidays and leave per employee.
+- Money: AED; rates are confidential (rate:manage and employee:readCost admin and management only).
+
+---
+
+## 16. Role-by-permission matrices
+
+Generated from `src/domain/authz/permissions.ts` of each repository on 2026-11-02. "x" = granted on
+every resource within the assignment's scope; "project" = only for projects where the user is a
+member; "lead" = only for the project's GIS lead.
+
+### 16.1 GIS Practice Hub
+
+| Action | ADMINISTRATOR | GIS_MANAGER | GIS_LEAD | GIS_SPECIALIST | VIEWER |
+| --- | --- | --- | --- | --- | --- |
+| hub:read | x | x | x | x | x |
+| project:manage | x | x |  |  |  |
+| package:plan | x | x | x |  |  |
+| package:progress | x | x | x | x |  |
+| schema:manage | x | x | x | x |  |
+| resource:manage | x | x | x |  |  |
+| update:manage | x | x | x |  |  |
+| risk:manage | x | x | x | x |  |
+| rfi:manage | x | x | x | x |  |
+| qaqc:manage | x | x | x | x |  |
+| standard:manage | x | x |  |  |  |
+| innovation:manage | x | x | x | x |  |
+| workflow:manage | x | x | x |  |  |
+| list:manage | x | x |  |  |  |
+| period:manage | x | x |  |  |  |
+| clientSchema:manage | x | x | x | x |  |
+| export:run | x | x | x | x | x |
+| user:read | x |  |  |  |  |
+| user:manage | x |  |  |  |  |
+| setting:read | x |  |  |  |  |
+| setting:manage | x |  |  |  |  |
+| audit:read | x |  |  |  |  |
+| apiKey:manage | x |  |  |  |  |
+| import:run | x |  |  |  |  |
+
+Region scope: a GIS_LEAD or GIS_SPECIALIST assignment may carry a REGION scope (a `list_item` of
+list `region`); `scopeFor` then limits rows to projects of that region. GLOBAL is the default.
+
+### 16.2 GIS Resource Planner
+
+| Action | PROJECT_MANAGER | TEAM_LEAD | DISCIPLINE_DIRECTOR | MANAGEMENT | ADMINISTRATOR | MEMBER | VIEWER |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| discipline:read | x | x | x | x | x | x | x |
+| discipline:manage |  |  |  |  | x |  |  |
+| team:read | x | x | x | x | x | x | x |
+| team:manage |  |  |  |  | x |  |  |
+| staffRole:read | x | x | x | x | x | x | x |
+| staffRole:manage |  |  |  |  | x |  |  |
+| staffRole:readCost |  |  |  | x | x |  |  |
+| calendar:read | x | x | x | x | x | x | x |
+| calendar:manage |  |  |  |  | x |  |  |
+| holiday:manage |  | x | x |  | x |  |  |
+| employee:read |  | x | x | x | x |  |  |
+| employee:readNames |  | x | x |  | x |  |  |
+| employee:manage |  |  |  |  | x |  |  |
+| employee:readCost |  |  |  | x | x |  |  |
+| client:read | x | x | x | x | x | x | x |
+| client:manage |  |  |  |  | x |  |  |
+| project:read | project | x | x | x | x | x | x |
+| project:manage |  |  |  |  | x |  |  |
+| project:plan | project |  |  |  | x |  |  |
+| user:read |  |  |  |  | x |  |  |
+| user:manage |  |  |  |  | x |  |  |
+| setting:read |  |  |  |  | x |  |  |
+| setting:manage |  |  |  |  | x |  |  |
+| audit:read |  |  |  |  | x |  |  |
+| leave:read |  | x | x | x | x |  |  |
+| leave:readType |  | x | x |  | x |  |  |
+| leave:manage |  | x |  |  | x |  |  |
+| stage:read | project | x | x | x | x | x | x |
+| stage:manage | project | x |  |  | x |  |  |
+| profile:manage |  |  |  |  | x |  |  |
+| capacity:read |  | x | x | x | x |  | x |
+| allocation:read | project | x | x | x | x | x | x |
+| allocation:readNames | project | x | x |  | x |  |  |
+| allocation:manage |  | x |  |  | x |  |  |
+| allocation:decide |  |  | x |  | x |  |  |
+| request:read | project | x | x | x | x | x | x |
+| request:create | project |  |  |  | x |  |  |
+| request:route |  |  | x |  | x |  |  |
+| request:decide |  |  | x |  | x |  |  |
+| report:export | project | x | x | x | x | x | x |
+| apiKey:manage |  |  |  |  | x |  |  |
+| import:run |  |  |  |  | x |  |  |
+| actual:read | project | x | x | x | x | x | x |
+| actual:manage |  | x |  |  | x |  |  |
+| review:read |  | x | x | x | x |  | x |
+| list:manage |  |  |  |  | x |  |  |
+| budget:read |  |  | x | x | x |  |  |
+| budget:manage |  |  | x |  | x |  |  |
+| bid:read | x | x | x | x | x | x | x |
+| bid:manage |  |  | x |  | x |  |  |
+| actual:self | x | x | x | x | x | x | x |
+| rate:manage |  |  |  |  | x |  |  |
+| calc:manage |  |  |  |  | x |  |  |
+| dashboard:pm | x |  |  |  | x |  |  |
+| dashboard:teamLead |  | x |  |  | x |  |  |
+| dashboard:director |  |  | x |  | x |  |  |
+| dashboard:management |  |  |  | x | x |  |  |
+
+Note: the planner matrix also contains `staffRole:*` actions that section 3.1 listed under their
+older names; the table above is the authoritative list. Planner scope types are GLOBAL, DISCIPLINE
+and TEAM (`ROLE_SCOPES` says which roles accept which).
+
+---
+
+## 17. Architecture diagram
+
+```mermaid
+flowchart LR
+  subgraph Users
+    GM[GIS Manager]
+    GL[GIS Leads]
+    GS[GIS Specialists]
+    PM[Project Managers and Management]
+  end
+
+  subgraph Render["Render workspace - Ahmed Workspase (Frankfurt, free plan)"]
+    RP["resource-planner (Docker, Next.js 16)<br/>resource-planner-minr.onrender.com"]
+    GH["gis-practice-hub (Docker, Next.js 16)<br/>gis-practice-hub.onrender.com"]
+    DB[("resource-planner-db (PostgreSQL 16)<br/>db resource_planner_db_f0ff<br/>db gis_practice_hub<br/>expires 2026-11-19")]
+  end
+
+  subgraph GitHub["GitHub - engahmedelfatih-AECOM"]
+    R1[resource-planner<br/>main, split-planner PR 8]
+    R2[gis-practice-hub<br/>main]
+  end
+
+  subgraph Files["Team files (AECOM SharePoint / OneDrive)"]
+    XL[GIS_Practice_Hub.xlsx<br/>QIC_Master_Tracker_AECOM.xlsx]
+    STD[GIS-STD-001 working standard]
+    FS[09_Systems_Development folder]
+  end
+
+  GM & GL & GS & PM --> RP
+  GM & GL & GS --> GH
+  RP --> DB
+  GH --> DB
+  R1 -- auto-deploy main --> RP
+  R2 -- auto-deploy main --> GH
+  XL -- admin import (dry run, apply) --> GH
+  GH -- "/api/hub/v1/* (x-api-key)" --> RP
+  RP -- "hubUrl per project, planner.url setting" --> GH
+  OSM[(OpenStreetMap tiles)] --> GH
+  ENTRA[Microsoft Entra ID - optional] -.-> RP & GH
+  SMTP[SMTP - optional] -.-> RP
+```
+
+Layering inside each application: `app` (routes, server actions) -> `application` (use cases) ->
+`domain` (rules, enums, zod) and `infrastructure` (Drizzle schema, auth, mail, logging);
+`components` read only `domain` types and `lib`. ESLint boundaries fail the build on a violation.
+
+---
+
+## 18. Files bundled with this handover
+
+Committed in `gis-practice-hub` under `docs/handover/` so they survive the building session:
+
+| File | What it is |
+| --- | --- |
+| `GIS-STD-001_Working_Standard.md` | The working standard (Markdown mirror of the Word and PowerPoint versions): purpose, the two files, roles, the 11-step workflow, sheet by sheet guidance, the client Master Tracker, the progress meeting, definitions, checklists, governance |
+| `09_Systems_Development_Folder_Structure.md` | The agreed OneDrive folder structure with rules |
+| `Create_09_Systems_Development_Structure.ps1` | PowerShell script that creates that structure |
+| `screenshots/dashboard.png`, `projects.png`, `packages.png`, `schema.png`, `updates.png`, `tracker.png`, `report.png`, `form.png`, `lists.png`, `import.png` | Hub screens captured on 2026-10-30 from the local build with sample data |
+| `PROJECT_INSTRUCTIONS.md` | Text for the Claude Project instructions field (section 19) |
+| `FIRST_SESSION_PROMPT.md` | Prompt for the first session in the new Project (section 20) |
+
+Also in git already: `tests/fixtures/GIS_Practice_Hub_sample.xlsx` (the v5 workbook with sample
+data) in the Hub repository; `standards/templates/` with `AECOM_PPT_Template.pptx` and the logo
+variants on the planner branch `brand-standards` (PR #7).
+
+Not in git, only in the copies sent to the owner in chat: the Word and PowerPoint working
+standard, `GIS_Practice_Hub_v5.xlsx` as delivered, `QIC_Master_Tracker_AECOM.xlsx`, the Python
+workbook builders, the planner split plan HTML and deck, the superseded `video-prompt.md` (it
+describes the in-planner Hub and must be rewritten before use). File them under
+09_Systems_Development.
+
+---
+
+## 19. Project instructions for "P10 System & Development"
+
+Paste the following into the Project's instructions field (also saved as
+`docs/handover/PROJECT_INSTRUCTIONS.md`):
+
+```
+You work for Ahmed Elfatih, GIS Manager, AECOM Middle East GIS Practice, on two applications:
+the GIS Resource Planner (GitHub engahmedelfatih-AECOM/resource-planner) and the GIS Practice Hub
+(GitHub engahmedelfatih-AECOM/gis-practice-hub). Read HANDOVER_P10_Resource_Planner_and_GIS_Hub.md
+at the root of either repository before any work; it is the state of record. Read each
+repository's CLAUDE.md and follow it.
+
+Rules that apply to everything you produce (code, docs, UI text, commits, chat):
+- Never use a long dash anywhere. Use "-" only.
+- Answers in short points. Lead with the result.
+- Colours only from the AECOM tokens in src/app/globals.css (Earth Green primary). Never raw hex
+  in components. Typography Arial. Wordmark instead of logo: "GIS Practice | Resource Planner"
+  and "GIS Practice | GIS Hub".
+- Client and project data stays on AECOM systems. Render holds sample data only.
+- No passwords, tokens or connection strings in any file or message. Refer to environment
+  variable names. Credentials live in the Render dashboard and with Ahmed.
+- Keep the ESLint layer boundaries (domain, application, infrastructure, components, app, lib).
+- The Hub mirrors GIS_Practice_Hub.xlsx one to one (columns, dropdowns, formulas). Only approved
+  differences: date pickers, map, roles, audit, import, exports, API.
+- Run lint, typecheck and unit tests before every push. Integration and e2e tests need PostgreSQL.
+- Commit messages: imperative subject, points in the body, the attribution lines the session
+  gives you, no model identifiers.
+- Decks use AECOM_PPT_Template.pptx. Documents use the AECOM Word template.
+- Ask before destructive actions (data wipe, migrations that drop data, force pushes). Everything
+  else: do it and report.
+- When you finish a task, update the handover file (decision log, decided but not built, known
+  issues) in the same commit.
+```
+
+---
+
+## 20. First-session prompt for the new Project
+
+Saved as `docs/handover/FIRST_SESSION_PROMPT.md`. Use it as the first message in the Project:
+
+```
+Read HANDOVER_P10_Resource_Planner_and_GIS_Hub.md in the gis-practice-hub repository (same file
+is on branch split-planner of resource-planner). Then:
+
+1. Check the two remaining [VERIFY] items and update the file: the planner's seeded
+   Administrator e-mail (Administration > Users on https://resource-planner-minr.onrender.com),
+   and anything that changed on GitHub or Render since 2026-11-02 (open PRs, deploys, the
+   database expiry date of resource-planner-db).
+2. Report the state of the critical item: the Render database resource-planner-db expires on
+   2026-11-19. Tell me the exact steps to upgrade it or to dump and recreate it, and wait for my
+   decision before touching it.
+3. Prepare the merge of PR #8 (split-planner into main) on resource-planner: confirm CI is green,
+   list the PRs to close afterwards (#2 to #6) and confirm PR #7 still merges cleanly. Do not merge
+   until I say so.
+4. List, in points, the first setup steps I must do myself in the Hub (AECOM admin user, workbook
+   import, client trackers, map coordinates, settings, demo accounts).
+5. Tell me anything in the handover that contradicts the code you read.
+
+Rules: hyphen only, never a long dash; short points; no secrets in files or chat; AECOM tokens and
+Arial; sample data only on Render.
+```
+
+---
+
+## 21. Completeness check
+
+Re-read on 2026-11-02 after the revision. Each required section is present; the table says what
+each one rests on and what still carries a [VERIFY] marker.
 
 | Section | Source | Confidence | Remaining [VERIFY] |
 | --- | --- | --- | --- |
 | 1 Executive summary | both repositories, Render connector, session history | high | none |
-| 2 Repository and environment | git logs, package.json, .env.example, render.yaml, CI files, Render connector | high | open PR list could not be re-queried (gh blocked in the sandbox); PR #7 rebase conflicts |
+| 2 Repository and environment | git logs, package.json, .env.example, render.yaml, CI files, GitHub REST API, Render connector | high | none (open PRs confirmed; PR #7 merge tested; planner auto-deploy and live commit confirmed) |
 | 3 Data model | schema files, migrations, enums, permissions, rules | high | none |
-| 4 Features planner | route folders, nav, scripts, docs on split-planner | high | live planner demo content (main still on Hub Phase A) not opened from the sandbox |
-| 5 Features hub | route folders, registers.ts, rules.ts, import.ts, docs | high | none |
-| 6 Connectors and integrations | session history, env names, code | medium | ArcGIS Online group "AECOM ME GIS Practice Hub" existence |
+| 4 Features planner | route folders, nav, scripts, docs, Render deploy list | high | none |
+| 5 Features hub | route folders, registers.ts, rules.ts, import.ts, docs, Render logs of first boot | high | none |
+| 6 Connectors and integrations | session history, env names, code, ArcGIS Online group search | high | none (no portal group exists) |
 | 7 Claude Code setup | repository inventory (no .claude folders), session conventions | high | none |
-| 8 Decision log | session history | medium (dates approximate to the day) | none |
+| 8 Decision log | session history | medium (dates accurate to the day) | none |
 | 9 Decided but not yet built | session history, owner confirmations | high | none |
-| 10 Known issues | session history, Render logs | medium | planner seeded admin e-mail; Render free database expiry policy; planner feed re-scoping after PR #8 |
+| 10 Known issues | Render connector (database expiry), session history | high | planner seeded admin e-mail (Render logs no longer cover 2026-10-20) |
 | 11 Roadmap | session history, owner's plan | medium | none |
 | 12 Open questions | session history | n/a | none |
 | 13 Quick-start | repository READMEs and runbooks | high | none |
 | 14 Appendix | git log, package.json, uploads and scratchpad inventories | high | none |
+| 15 Business context | seed-lists.ts, GIS-STD-001, team e-mail | high | none |
+| 16 Permission matrices | generated from permissions.ts by script | high | none |
+| 17 Diagram | sections 2 and 6 | high | none |
+| 18 Bundled files | docs/handover listing | high | none |
+| 19 and 20 Project texts | the rules of this session | n/a | none |
 
 Checks performed on the text: no long dash character anywhere (grep for U+2013 and U+2014 returned
-zero); no password, token, secret value or connection string appears (environment variable names
-only; the Render database id and service ids are identifiers, not credentials); every repository,
-branch, commit, service, table, route, file and environment variable is named concretely; the
-Hub is described as a separate application, with its earlier life as a planner module recorded in
-sections 1, 4 and 8 and in the planner commit history.
+zero, also on the bundled files); no password, token, secret value or connection string appears
+(environment variable names only; Render ids and database names are identifiers, not credentials);
+every repository, branch, commit, service, table, route, file and environment variable is named
+concretely; the Hub is described as a separate application, with its earlier life as a planner
+module recorded in sections 1, 4 and 8 and in the planner commit history.
 
-Gaps a fresh instance should close first: run `gh pr list` on `resource-planner` to confirm the
-open PRs; open both demo URLs from a browser to confirm which code is live; confirm the planner's
-seeded admin e-mail in Administration > Users; decide the fate of `/api/hub/v1` in the planner.
+What a fresh instance should still do first: the two-point list in section 20 (planner admin
+e-mail; the 2026-11-19 database expiry), then PR #8.
 
-Where this file lives: committed to `resource-planner` on branch `split-planner` (so it reaches
-`main` with PR #8) and to `gis-practice-hub` on `main`, both at the repository root as
-`HANDOVER_P10_Resource_Planner_and_GIS_Hub.md`.
+Where this file lives: `resource-planner` on branch `split-planner` (reaches `main` with PR #8) and
+`gis-practice-hub` on `main`, both at the repository root as
+`HANDOVER_P10_Resource_Planner_and_GIS_Hub.md`, with the bundled files under `docs/handover/` in
+`gis-practice-hub`.
