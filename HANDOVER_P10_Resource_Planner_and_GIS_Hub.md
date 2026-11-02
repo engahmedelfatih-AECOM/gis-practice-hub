@@ -444,6 +444,7 @@ dropdown behaviour, formulas) follows the workbook.
 | 2026-11-01 | Admin account must use ahmed.elfatih@aecom.com; the Gmail seeded account is to be replaced | Corporate identity |
 | 2026-11-02 | Work continues in the P10 Project thread "Continue Resource Planner and Hub handover"; this file stays the state of record | Owner's instruction |
 | 2026-11-02 | No merge of PR #8, no data wipe and no database change until the owner gives an explicit go | Owner's instruction |
+| 2026-11-02 | Database: option B chosen - one-off pg_dump of both databases from the owner's PC, then upgrade `resource-planner-db` to the smallest paid type in the Render dashboard (owner executes) | Keeps data and connection strings; first backup ever; avoids the free 30-day re-create cycle |
 
 ---
 
@@ -506,7 +507,7 @@ Both:
   dump-and-recreate on the free plan only buys 30 days. Steps and risks of both options:
   `DB_Expiry_Options_resource-planner-db.md` (Project files, 03_Shared/04_Database). Recommended:
   upgrade to the smallest paid type before 2026-11-17, with a one-off pg_dump first. Decision
-  pending with the owner.
+  chosen by the owner on 2026-11-02: option B (pg_dump, then upgrade); execution by the owner.
 - Hub admin seeded with engahmedelfatih@gmail.com because `SEED_ADMIN_EMAIL` was changed after the
   first boot; the seed only runs when no user exists. Fix by creating the AECOM user in-app (see
   section 9). The planner was seeded on 2026-10-20 with the `SEED_ADMIN_EMAIL` set at that time;
