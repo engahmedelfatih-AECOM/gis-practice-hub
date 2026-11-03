@@ -13,17 +13,25 @@ import {
   deliveredText,
   deliverySummary,
   disciplineGroup,
+  disciplineStageLabel,
   inProgressText,
   nextMilestone,
+  packageQaqcResult,
+  packagesByStatus,
+  resourcesByHub,
+  rfiNumber,
   periodBucket,
   periodLabel,
   projectUtilisation,
   qaqcScore,
   resourcesRegion,
   rfiCounts,
+  rfiOverdue,
   rfiRag,
   submissionsInPeriod,
+  utilisationFromHours,
   todayIso,
+  type CountRow,
   type DashboardKpis,
   type DeliverySummary,
   type Milestone,
@@ -42,7 +50,8 @@ import {
   workflowStep,
 } from "@/infrastructure/db/schema";
 import type { Actor } from "@/application/auth/actor";
-import { notFound } from "@/application/errors";
+import { inScope, scopeOf } from "@/application/authz/scope";
+import { forbidden, notFound } from "@/application/errors";
 import { assertCan } from "@/application/shared/guard";
 import { getSetting } from "@/application/settings/settings";
 import { disciplineGroups } from "./lists";
@@ -57,7 +66,7 @@ export type UpdateRow = typeof updateItem.$inferSelect;
 export type QaqcRow = typeof qaqcChecklist.$inferSelect;
 
 /** Every register in one read: the registers are small (hundreds of rows), the derivations cross them. */
-const loadAll = cache(async () => {
+const loadEverything = cache(async () => {
   const [projects, packages, rfis, risks, resources, updates, qaqc] = await Promise.all([
     db.select().from(project).orderBy(asc(project.sortOrder), asc(project.name)),
     db.select().from(pkg).orderBy(asc(pkg.sortOrder), asc(pkg.createdAt)),
@@ -70,7 +79,38 @@ const loadAll = cache(async () => {
   return { projects, packages, rfis, risks, resources, updates, qaqc };
 });
 
+/**
+ * The registers this actor may see. A region-scoped grant keeps only the projects of its hubs and
+ * the rows that hang off them; rows without a project are practice-wide and stay.
+ */
+const loadAll = cache(async (actor: Actor) => {
+  const [all, scope] = await Promise.all([loadEverything(), scopeOf(actor, "hub:read")]);
+  if (scope.all) return all;
+  const keep = <T extends { projectId?: string | null }>(rows: T[]) => rows.filter((r) => inScope(scope, r.projectId));
+  return {
+    projects: all.projects.filter((p) => scope.projectIds.includes(p.id)),
+    packages: keep(all.packages),
+    rfis: keep(all.rfis),
+    risks: keep(all.risks),
+    resources: keep(all.resources),
+    updates: keep(all.updates),
+    qaqc: keep(all.qaqc),
+  };
+});
+
 const num = (v: string | number | null | undefined) => (v === null || v === undefined || v === "" ? null : Number(v));
+
+/**
+ * A project the actor cannot see is either not there or not theirs. Say which, so a region lead
+ * is told plainly instead of being shown a missing page.
+ */
+async function outsideScope(actor: Actor, projectId: string): Promise<Error> {
+  const scope = await scopeOf(actor, "hub:read");
+  const [row] = scope.all ? [] : await db.select({ id: project.id }).from(project).where(eq(project.id, projectId)).limit(1);
+  return row
+    ? forbidden(`see this project (your access covers ${scope.regionValues.join(", ") || "no region"})`)
+    : notFound("Project");
+}
 
 export interface ProjectView extends ProjectRow {
   region: string;
@@ -86,7 +126,7 @@ export interface ProjectView extends ProjectRow {
 
 function deriveProject(
   p: ProjectRow,
-  data: Awaited<ReturnType<typeof loadAll>>,
+  data: Awaited<ReturnType<typeof loadEverything>>,
   period: PeriodView | null,
   today: string,
 ): ProjectView {
@@ -99,7 +139,7 @@ function deriveProject(
     delivered: deliveredText(packages),
     inProgress: inProgressText(packages),
     milestone: nextMilestone(packages, p.milestoneOverride),
-    utilisation: projectUtilisation(resources.map((r) => ({ plannedHours: num(r.plannedHours), actualHours: num(r.actualHours) }))),
+    utilisation: projectUtilisation(resources),
     rfi: rfiCounts(rfis, today),
     submissionsThisPeriod: period ? submissionsInPeriod(packages, period.startDate, period.endDate) : 0,
     crsTotal: p.crsOpen + p.crsInReview + p.crsClosed,
@@ -110,7 +150,7 @@ function deriveProject(
 /** Projects register with every calculated column of the sheet. */
 export async function projectsView(actor: Actor, periodId?: string | null): Promise<{ rows: ProjectView[]; period: PeriodView | null; periods: PeriodView[] }> {
   assertCan(actor, "hub:read");
-  const [data, periods, period] = await Promise.all([loadAll(), listPeriods(), resolvePeriod(periodId)]);
+  const [data, periods, period] = await Promise.all([loadAll(actor), listPeriods(), resolvePeriod(periodId)]);
   const today = todayIso();
   return { rows: data.projects.map((p) => deriveProject(p, data, period, today)), period, periods };
 }
@@ -120,6 +160,9 @@ export interface Dashboard {
   periods: PeriodView[];
   kpis: DashboardKpis;
   statusCounts: { status: string; count: number }[];
+  /** Workbook tables "Packages by status" and "Resources by hub". */
+  packageStatusCounts: CountRow[];
+  hubCounts: CountRow[];
   projects: ProjectView[];
   map: { id: string; name: string; status: string; client: string | null; lat: number; lng: number; label: string | null }[];
   mapSettings: { lat: number; lng: number; zoom: number; styleUrl: string };
@@ -130,7 +173,7 @@ const STATUS_ORDER = ["Not Started", "Progressing", "At Risk", "On Hold", "Compl
 
 export async function dashboard(actor: Actor, periodId?: string | null): Promise<Dashboard> {
   assertCan(actor, "hub:read");
-  const [data, periods, period, center, styleUrl] = await Promise.all([loadAll(), listPeriods(), resolvePeriod(periodId), getSetting("map.center"), getSetting("map.styleUrl")]);
+  const [data, periods, period, center, styleUrl] = await Promise.all([loadAll(actor), listPeriods(), resolvePeriod(periodId), getSetting("map.center"), getSetting("map.styleUrl")]);
   const today = todayIso();
   const projects = data.projects.map((p) => deriveProject(p, data, period, today));
   const kpis = dashboardKpis({
@@ -138,15 +181,17 @@ export async function dashboard(actor: Actor, periodId?: string | null): Promise
     packages: data.packages,
     rfis: data.rfis,
     risks: data.risks,
-    resources: data.resources.map((r) => ({ plannedHours: num(r.plannedHours), actualHours: num(r.actualHours) })),
+    resources: data.resources,
     period: period ?? { startDate: today, endDate: today },
     today,
   });
   const statusCounts = STATUS_ORDER.map((status) => ({ status, count: data.projects.filter((p) => p.status === status).length }));
+  const packageStatusCounts = packagesByStatus(data.packages);
+  const hubCounts = resourcesByHub(data.resources);
   const map = projects
     .filter((p) => p.latitude && p.longitude)
     .map((p) => ({ id: p.id, name: p.name, status: p.status, client: p.client, lat: Number(p.latitude), lng: Number(p.longitude), label: p.locationLabel }));
-  return { period, periods, kpis, statusCounts, projects, map, mapSettings: { ...center, styleUrl }, today };
+  return { period, periods, kpis, statusCounts, packageStatusCounts, hubCounts, projects, map, mapSettings: { ...center, styleUrl }, today };
 }
 
 export interface UpdateBlockItem {
@@ -188,28 +233,28 @@ export interface DeliveryTrackerRow {
   actualSubmission: string | null;
   assignedTo: string | null;
   qaqcResult: string | null;
-  status: string;
+  status: string | null;
   clientReviewStatus: string | null;
   clientCommentRef: string | null;
   revisionNo: string | null;
   resubmissionDate: string | null;
   approvalDate: string | null;
   daysOverdue: number | null;
-  progressPct: number;
+  progressPct: number | null;
   remarks: string | null;
 }
 
-function trackerRows(packages: PackageRow[], today: string): DeliveryTrackerRow[] {
+function trackerRows(packages: PackageRow[], today: string, qaqc: QaqcRow[] = []): DeliveryTrackerRow[] {
   return packages.map((p, i) => ({
     n: i + 1,
     id: p.id,
-    disciplineStage: `${p.discipline} (${p.designStage.split(" -")[0]!.trim()})`,
+    disciplineStage: disciplineStageLabel(p),
     designApprovalDate: p.designApprovalDate,
     gisStartDate: p.gisStartDate,
     plannedSubmission: p.plannedSubmission,
     actualSubmission: p.actualSubmission,
     assignedTo: p.assignedTo,
-    qaqcResult: p.qaqcResult,
+    qaqcResult: packageQaqcResult(p.discipline, qaqc.filter((q) => q.projectId === p.id)),
     status: p.status,
     clientReviewStatus: p.clientReviewStatus,
     clientCommentRef: p.clientCommentRef,
@@ -226,7 +271,7 @@ function trackerRows(packages: PackageRow[], today: string): DeliveryTrackerRow[
 export async function projectPage(actor: Actor, projectId: string, periodId?: string | null): Promise<ProjectPage> {
   assertCan(actor, "hub:read");
   const [data, periods, period, groups, itemsPerBlock, apps, workflow] = await Promise.all([
-    loadAll(),
+    loadAll(actor),
     listPeriods(),
     resolvePeriod(periodId),
     disciplineGroups(),
@@ -236,7 +281,7 @@ export async function projectPage(actor: Actor, projectId: string, periodId?: st
   ]);
   const today = todayIso();
   const p = data.projects.find((x) => x.id === projectId);
-  if (!p) throw notFound("Project");
+  if (!p) throw await outsideScope(actor, projectId);
   const view = deriveProject(p, data, period, today);
   const packages = data.packages.filter((x) => x.projectId === projectId);
   const updates = data.updates.filter((u) => u.projectId === projectId && period && periodBucket(u.periodFrom, periods)?.id === period.id);
@@ -256,8 +301,8 @@ export async function projectPage(actor: Actor, projectId: string, periodId?: st
     period,
     periods,
     packages: packages.map((x) => ({ ...x, group: disciplineGroup(x.discipline, groups), overdue: daysOverdue(x.plannedSubmission, x.actualSubmission, today) })),
-    delivered: packages.filter((x) => ["Submitted", "Resubmitted", "Approved"].includes(x.status)),
-    inProgress: packages.filter((x) => ["Not Started", "In Progress", "Internal QA/QC", "Client Comments", "On Hold"].includes(x.status)),
+    delivered: packages.filter((x) => ["Submitted", "Resubmitted", "Approved"].includes(x.status ?? "")),
+    inProgress: packages.filter((x) => x.status === null || ["Not Started", "In Progress", "Internal QA/QC", "Client Comments", "On Hold"].includes(x.status)),
     resources: data.resources.filter((r) => r.projectId === projectId),
     blocks,
     qaqc: { checklists: checklists.length, pass: scored.filter((s) => s.result === "Pass").length, fail: scored.filter((s) => s.result === "Fail").length },
@@ -267,7 +312,7 @@ export async function projectPage(actor: Actor, projectId: string, periodId?: st
     apps,
     workflow,
     itemsPerBlock,
-    tracker: { rows: trackerRows(packages, today), summary: deliverySummary(packages) },
+    tracker: { rows: trackerRows(packages, today, checklists), summary: deliverySummary(packages) },
     today,
   };
 }
@@ -275,16 +320,16 @@ export async function projectPage(actor: Actor, projectId: string, periodId?: st
 /** Delivery Tracker of one project (the one-page view of its Packages rows). */
 export async function deliveryTracker(actor: Actor, projectId: string) {
   assertCan(actor, "hub:read");
-  const data = await loadAll();
+  const data = await loadAll(actor);
   const p = data.projects.find((x) => x.id === projectId);
-  if (!p) throw notFound("Project");
+  if (!p) throw await outsideScope(actor, projectId);
   const today = todayIso();
   const packages = data.packages.filter((x) => x.projectId === projectId);
   const resources = data.resources.filter((x) => x.projectId === projectId);
   return {
     project: p,
     gisLead: p.gisLead ?? resources.find((r) => r.role === "GIS Lead")?.name ?? null,
-    rows: trackerRows(packages, today),
+    rows: trackerRows(packages, today, data.qaqc.filter((q) => q.projectId === projectId)),
     summary: deliverySummary(packages),
     today,
     projects: data.projects.map((x) => ({ id: x.id, name: x.name })),
@@ -295,16 +340,34 @@ export async function deliveryTracker(actor: Actor, projectId: string) {
 export async function registerExtras(key: "packages" | "rfis" | "qaqc" | "resources" | "updates") {
   const today = todayIso();
   if (key === "packages") {
-    const groups = await disciplineGroups();
+    const [groups, checklists] = await Promise.all([disciplineGroups(), db.select().from(qaqcChecklist)]);
     return (row: Record<string, unknown>) => ({
       "Discipline Group": disciplineGroup(row.discipline as string, groups) ?? "",
+      "QA/QC Result": packageQaqcResult(
+        row.discipline as string | null,
+        checklists.filter((q) => q.projectId === (row.projectId as string | null)),
+      ),
       "Days Overdue": daysOverdue(row.plannedSubmission as string | null, row.actualSubmission as string | null, today) ?? "",
     });
   }
   if (key === "rfis") {
+    // RFI No. is calculated in the workbook: the running number of that project's RFIs.
+    const rows = await db.select({ id: rfi.id, projectId: rfi.projectId }).from(rfi).orderBy(asc(rfi.sortOrder), asc(rfi.createdAt));
+    const numbers = new Map<string, string>();
+    const perProject = new Map<string, number>();
+    for (const r of rows) {
+      const key = r.projectId ?? "-";
+      const n = (perProject.get(key) ?? 0) + 1;
+      perProject.set(key, n);
+      numbers.set(r.id, rfiNumber(n));
+    }
     return (row: Record<string, unknown>) => {
-      const r = { status: row.status as string, dueDate: row.dueDate as string | null };
-      return { Overdue: rfiRag(r, today) === "Red" ? "Yes" : "No", RAG: rfiRag(r, today) };
+      const r = { status: (row.status as string | null) ?? null, dueDate: row.dueDate as string | null };
+      return {
+        "RFI No.": numbers.get(row.id as string) ?? "",
+        Overdue: rfiOverdue(r, today) ? "Yes" : "No",
+        RAG: rfiRag(r, today),
+      };
     };
   }
   if (key === "qaqc") {
@@ -314,9 +377,10 @@ export async function registerExtras(key: "packages" | "rfis" | "qaqc" | "resour
     };
   }
   if (key === "resources") {
+    // Utilisation % is typed (workbook dropdown); the hours only suggest a value when it is empty.
     return (row: Record<string, unknown>) => {
-      const u = projectUtilisation([{ plannedHours: num(row.plannedHours as string), actualHours: num(row.actualHours as string) }]);
-      return { "Utilisation %": u === null ? "" : `${u} %` };
+      const suggested = utilisationFromHours(num(row.plannedHours as string), num(row.actualHours as string));
+      return { "Suggested from hours": suggested === null ? "" : `${suggested} %` };
     };
   }
   const periods = await listPeriods();

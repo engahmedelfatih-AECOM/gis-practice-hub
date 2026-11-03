@@ -58,7 +58,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Se
           <Kpi label="Submissions this period" value={k.submissionsThisPeriod} />
           <Kpi label="Open client comments" value={k.openClientComments} dark />
           <Kpi label="Open RFIs" value={k.openRfis} />
-          <Kpi label="Team utilisation" value={k.teamUtilisation === null ? "-" : `${k.teamUtilisation} %`} dark />
+          <Kpi label="Team utilisation" value={`${k.teamUtilisation} %`} dark />
           <Kpi label="Open risks" value={k.openRisks} />
           <Kpi label="Overdue RFIs" value={k.overdueRfis} dark />
         </div>
@@ -133,6 +133,19 @@ export default async function DashboardPage({ searchParams }: { searchParams: Se
                 </ul>
               </CardBody>
             </Card>
+            {/* The two tables of the workbook Dashboard, beside "Projects by status". */}
+            <Card>
+              <CardHeader title="Packages by status" />
+              <CardBody>
+                <CountTable rows={d.packageStatusCounts} head="Status" />
+              </CardBody>
+            </Card>
+            <Card>
+              <CardHeader title="Resources by hub" />
+              <CardBody>
+                <CountTable rows={d.hubCounts} head="Hub" />
+              </CardBody>
+            </Card>
           </div>
         </div>
         <Card>
@@ -144,6 +157,36 @@ export default async function DashboardPage({ searchParams }: { searchParams: Se
       </div>
     );
   });
+}
+
+/** A workbook count table: label, count and share, with a Total row. */
+function CountTable({ rows, head }: { rows: { label: string; count: number; share: number }[]; head: string }) {
+  const total = rows.reduce((a, b) => a + b.count, 0);
+  return (
+    <table className="w-full text-sm">
+      <thead>
+        <tr className="border-border border-b text-left text-xs tracking-wide text-gray-600 uppercase">
+          <th className="py-1 font-semibold">{head}</th>
+          <th className="py-1 text-right font-semibold">Count</th>
+          <th className="py-1 text-right font-semibold">Share</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((r) => (
+          <tr key={r.label} className="border-border/60 border-b last:border-0">
+            <td className="py-1">{r.label}</td>
+            <td className="py-1 text-right tabular-nums">{r.count}</td>
+            <td className="py-1 text-right tabular-nums text-gray-600">{Math.round(r.share * 100)} %</td>
+          </tr>
+        ))}
+        <tr className="font-semibold">
+          <td className="py-1">Total</td>
+          <td className="py-1 text-right tabular-nums">{total}</td>
+          <td className="py-1 text-right tabular-nums">{total ? "100 %" : "0 %"}</td>
+        </tr>
+      </tbody>
+    </table>
+  );
 }
 
 function Kpi({ label, value, dark }: { label: string; value: string | number; dark?: boolean }) {

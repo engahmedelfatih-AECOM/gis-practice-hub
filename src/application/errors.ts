@@ -39,3 +39,11 @@ export const validation = (message: string, details?: Record<string, string[]>) 
 export function isAppError(err: unknown): err is AppError {
   return err instanceof AppError;
 }
+
+/**
+ * An error a use case throws on purpose to roll a transaction back (the import dry run), so the
+ * logs do not report it as a failure. Such a class sets `expected = true` on itself.
+ */
+export function isExpected(err: unknown): boolean {
+  return Boolean(err && typeof err === "object" && (err as { expected?: boolean }).expected === true);
+}

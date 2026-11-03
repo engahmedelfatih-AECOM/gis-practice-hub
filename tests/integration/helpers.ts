@@ -6,7 +6,10 @@ import type { Role, ScopeType } from "@/domain/shared/enums";
 
 /** Truncate every business table (keeps the migrations journal). */
 export async function resetDb(): Promise<void> {
-  await db.execute(sql`
+  // audit_log refuses TRUNCATE unless gh.allow_truncate is on for the transaction (migration 0002).
+  await db.transaction(async (tx) => {
+    await tx.execute(sql`select set_config('gh.allow_truncate', 'on', true)`);
+    await tx.execute(sql`
     TRUNCATE TABLE
       import_run, client_domain, client_subtype, client_field, client_feature_class, client_schema,
       workflow_step, enterprise_app, innovation_item, standard_item, qaqc_checklist, rfi, risk,
@@ -14,6 +17,7 @@ export async function resetDb(): Promise<void> {
       api_key, app_setting, audit_log,
       role_assignment, auth_session, auth_account, auth_verification, auth_rate_limit, app_user
     RESTART IDENTITY CASCADE`);
+  });
 }
 
 export interface Grant {

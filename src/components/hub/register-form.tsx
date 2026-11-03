@@ -29,6 +29,7 @@ export function RegisterForm({
   values,
   sources,
   readOnly,
+  options,
   hidden,
   submitLabel,
   cancelHref,
@@ -39,6 +40,8 @@ export function RegisterForm({
   values: Record<string, unknown>;
   sources: FormSources;
   readOnly?: Set<string>;
+  /** Narrower choices for this role (a GIS Specialist sets a status only up to Internal QA/QC). */
+  options?: Record<string, readonly string[]>;
   hidden?: Record<string, string>;
   submitLabel: string;
   cancelHref: string;
@@ -62,7 +65,23 @@ export function RegisterForm({
               hint={readOnly?.has(f.key) ? "Read-only for your role" : f.hint}
               className={f.type === "textarea" ? "md:col-span-2 xl:col-span-3" : undefined}
             >
-              {(p) => <Control field={f} value={values[f.key]} sources={sources} disabled={readOnly?.has(f.key)} p={p} />}
+              {(p) => (
+                <>
+                  <Control
+                    field={f}
+                    value={values[f.key]}
+                    sources={sources}
+                    disabled={readOnly?.has(f.key)}
+                    allowed={options?.[f.key]}
+                    p={p}
+                  />
+                  {/* A disabled control posts nothing, so the current value travels in a hidden
+                      field: the row keeps it and the server still sees a complete row. */}
+                  {readOnly?.has(f.key) ? (
+                    <input type="hidden" name={f.key} value={values[f.key] === null || values[f.key] === undefined ? "" : String(values[f.key])} />
+                  ) : null}
+                </>
+              )}
             </Field>
           ))}
       </div>
@@ -81,16 +100,20 @@ function Control({
   value,
   sources,
   disabled,
+  allowed,
   p,
 }: {
   field: FieldDef;
   value: unknown;
   sources: FormSources;
   disabled?: boolean;
+  allowed?: readonly string[];
   p: { id: string; name: string; "aria-invalid": boolean; "aria-describedby": string | undefined };
 }) {
   const v = value === null || value === undefined ? "" : String(value);
-  const common = { ...p, disabled, readOnly: disabled };
+  // A control the role may not change is also left out of the tab order; its value is posted
+  // by the hidden field beside it.
+  const common = { ...p, disabled, readOnly: disabled, tabIndex: disabled ? -1 : undefined };
   switch (f.type) {
     case "textarea":
       return <Textarea {...common} defaultValue={v} maxLength={4000} />;
@@ -100,16 +123,21 @@ function Control({
       return <Input {...common} type="number" step="any" defaultValue={v} />;
     case "int":
       return <Input {...common} type="number" step="1" min={0} defaultValue={v || "0"} />;
-    case "pct":
+    case "pct": {
+      // The steps of the workbook dropdown (0 to 100 %, or 0 to 120 % for Utilisation).
+      const steps = f.options ? [...f.options] : PCT.map(String);
       return (
-        <Select {...common} defaultValue={v || "0"}>
-          {PCT.map((n) => (
+        <Select {...common} defaultValue={v}>
+          <option value="">-</option>
+          {steps.map((n) => (
             <option key={n} value={n}>
               {n} %
             </option>
           ))}
+          {v && !steps.includes(v) ? <option value={v}>{v} %</option> : null}
         </Select>
       );
+    }
     case "url":
       return <Input {...common} type="url" placeholder="https://aecom.sharepoint.com/..." defaultValue={v} />;
     case "project":
@@ -124,8 +152,16 @@ function Control({
         </Select>
       );
     case "select": {
-      const options = f.options ? [...f.options] : f.people ? sources.people : f.list ? (sources.lists[f.list] ?? []) : [];
-      if (f.strict) {
+      const options = allowed
+        ? [...allowed]
+        : f.options
+          ? [...f.options]
+          : f.people
+            ? sources.people
+            : f.list
+              ? (sources.lists[f.list] ?? [])
+              : [];
+      if (f.strict || allowed) {
         return (
           <Select {...common} defaultValue={v}>
             <option value="">{f.required ? "Choose..." : "-"}</option>

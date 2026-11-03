@@ -36,8 +36,13 @@ export interface FieldDef {
   progress?: boolean;
   /** Not editable: derived, shown read-only. */
   derived?: boolean;
+  /** Upper bound of a pct field (default 100). */
+  max?: number;
   hint?: string;
 }
+
+/** Utilisation % dropdown of the workbook (Lists!J6:J18): 0 to 120 % in steps of 10. */
+export const UTILISATION_OPTIONS = Array.from({ length: 13 }, (_, i) => String(i * 10)) as readonly string[];
 
 export type RegisterKey =
   | "projects"
@@ -64,6 +69,11 @@ export interface RegisterDef {
   nameField: string;
   /** Natural key of a row for the workbook import (upsert). */
   naturalKey: string[];
+  /**
+   * The cells that make a sheet row exist (the column the workbook's own "#" formula tests).
+   * A row whose row-key cells are all empty or "-" is not a row: the import skips it.
+   */
+  rowKey: string[];
   path: string;
 }
 
@@ -84,6 +94,7 @@ export const PROJECTS: RegisterDef = {
   manage: "project:manage",
   nameField: "name",
   naturalKey: ["name"],
+  rowKey: ["name"],
   fields: [
     text("name", "Project Name", { required: true }),
     text("client", "Client"),
@@ -117,6 +128,7 @@ export const PACKAGES: RegisterDef = {
   plan: "package:plan",
   nameField: "description",
   naturalKey: ["projectId", "designStage", "discipline", "description"],
+  rowKey: ["projectId"],
   fields: [
     project({ required: true }),
     sel("designStage", "Design Stage", "designStage", { required: true }),
@@ -132,7 +144,8 @@ export const PACKAGES: RegisterDef = {
     area("remarks", "Remarks", { progress: true }),
     date("designApprovalDate", "Design Approval Date"),
     date("gisStartDate", "GIS Start Date", { progress: true }),
-    sel("qaqcResult", "QA/QC Result", "rfiStatus", { options: CHECK_RESULTS, list: undefined }),
+    // Calculated in the workbook from the QAQC sheet (project + discipline): Fail, Pass or "-".
+    { key: "qaqcResult", label: "QA/QC Result", type: "text", derived: true },
     sel("clientReviewStatus", "Client Review Status", "clientReviewStatus", { strict: true }),
     text("clientCommentRef", "Client Comment Ref."),
     sel("revisionNo", "Revision No.", "revisionNo"),
@@ -149,6 +162,7 @@ export const SCHEMA: RegisterDef = {
   manage: "schema:manage",
   nameField: "featureClass",
   naturalKey: ["projectLabel", "featureClass"],
+  rowKey: ["featureClass"],
   fields: [
     text("projectLabel", "Project", { required: true, hint: "Pick from the register, or keep \"QIC - all projects\" for the shared QIC schema." }),
     text("groupingAbbr", "Grouping Abbr"),
@@ -176,6 +190,7 @@ export const RESOURCES: RegisterDef = {
   manage: "resource:manage",
   nameField: "name",
   naturalKey: ["name", "projectId"],
+  rowKey: ["name"],
   fields: [
     text("name", "Name", { required: true }),
     sel("role", "Role", "gisRole"),
@@ -185,6 +200,7 @@ export const RESOURCES: RegisterDef = {
     date("allocatedTo", "Allocated To"),
     { key: "plannedHours", label: "Planned Hrs (period)", type: "number" },
     { key: "actualHours", label: "Actual Hrs (period)", type: "number" },
+    { key: "utilisationPct", label: "Utilisation %", type: "pct", max: 120, options: UTILISATION_OPTIONS, strict: true, hint: "Typed as in the workbook (0 to 120 %)." },
     sel("availabilityNext", "Availability Next Period", "availability", { strict: true }),
     area("remarks", "Remarks"),
   ],
@@ -199,6 +215,7 @@ export const UPDATES: RegisterDef = {
   manage: "update:manage",
   nameField: "description",
   naturalKey: ["projectId", "periodFrom", "type", "description"],
+  rowKey: ["description"],
   fields: [
     date("meetingDate", "Meeting Date"),
     date("periodFrom", "Period From", { required: true }),
@@ -224,6 +241,7 @@ export const RISKS: RegisterDef = {
   manage: "risk:manage",
   nameField: "title",
   naturalKey: ["title", "projectId"],
+  rowKey: ["title"],
   fields: [
     area("title", "Risk / Issue", { required: true }),
     project(),
@@ -246,9 +264,12 @@ export const RFIS: RegisterDef = {
   description: "One row per RFI raised to a discipline or the client. Overdue and RAG are calculated; the counts flow to Projects, the Dashboard and the update pages.",
   manage: "rfi:manage",
   nameField: "rfiNo",
-  naturalKey: ["rfiNo", "projectId"],
+  // RFI No. is calculated, so an RFI is identified by its project, discipline and question.
+  naturalKey: ["projectId", "discipline", "question", "dateRaised"],
+  rowKey: ["projectId"],
   fields: [
-    text("rfiNo", "RFI No.", { required: true }),
+    // Calculated in the workbook: "RFI-" and the running number of the project's RFIs.
+    { key: "rfiNo", label: "RFI No.", type: "text", derived: true },
     project(),
     sel("designStage", "Design Stage", "designStage"),
     sel("discipline", "Discipline", "discipline"),
@@ -260,7 +281,7 @@ export const RFIS: RegisterDef = {
     area("response", "Response"),
     text("respondedBy", "Responded By"),
     date("responseDate", "Response Date"),
-    sel("status", "Status", "rfiStatus", { strict: true, required: true }),
+    sel("status", "Status", "rfiStatus", { strict: true }),
     area("remarks", "Remarks"),
   ],
 };
@@ -274,6 +295,7 @@ export const QAQC: RegisterDef = {
   manage: "qaqc:manage",
   nameField: "packageSubmission",
   naturalKey: ["projectId", "designStage", "discipline", "packageSubmission"],
+  rowKey: ["projectId"],
   fields: [
     project(),
     sel("designStage", "Design Stage", "designStage"),
@@ -295,6 +317,7 @@ export const STANDARDS: RegisterDef = {
   manage: "standard:manage",
   nameField: "title",
   naturalKey: ["title"],
+  rowKey: ["title"],
   fields: [
     text("title", "Standard / Document", { required: true }),
     text("fileName", "File Name"),
@@ -315,6 +338,7 @@ export const INNOVATION: RegisterDef = {
   manage: "innovation:manage",
   nameField: "initiative",
   naturalKey: ["initiative"],
+  rowKey: ["initiative"],
   fields: [
     date("date", "Date"),
     sel("category", "Category", "innovationCategory", { strict: true }),
@@ -375,10 +399,12 @@ function fieldSchema(f: FieldDef): z.ZodType {
       return optionalNumber;
     case "int":
       return optionalNumber.transform((n) => (n === null ? 0 : Math.round(n)));
-    case "pct":
+    case "pct": {
+      const max = f.max ?? 100;
       return optionalNumber
-        .transform((n) => (n === null ? 0 : Math.round(n)))
-        .refine((n) => n >= 0 && n <= 100, { message: "Progress is 0 to 100." });
+        .transform((n) => (n === null ? null : Math.round(n)))
+        .refine((n) => n === null || (n >= 0 && n <= max), { message: `${f.label} is 0 to ${max}.` });
+    }
     case "project":
       return f.required
         ? z.uuid({ message: "Pick a project." })

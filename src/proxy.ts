@@ -10,7 +10,12 @@ import { NextResponse, type NextRequest } from "next/server";
  */
 
 const SESSION_COOKIE = "gh.session_token";
-const PUBLIC_PATHS = ["/login", "/api/auth", "/api/health", "/brand", "/favicon.ico"];
+/**
+ * Paths that never need a session cookie. The machine interfaces are here because they carry
+ * their own credential (`x-api-key`) and their handlers check it: a redirect to /login would
+ * turn every feed call into an HTML page.
+ */
+const PUBLIC_PATHS = ["/login", "/api/auth", "/api/health", "/api/hub", "/api/jobs", "/brand", "/favicon.ico"];
 
 function isPublic(pathname: string): boolean {
   return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));

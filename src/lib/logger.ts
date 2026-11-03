@@ -9,7 +9,7 @@ const pretty = process.env.NODE_ENV === "development";
  */
 export const logger = pino({
   level,
-  base: { service: "resource-planner" },
+  base: { service: "gis-practice-hub" },
   redact: {
     paths: ["password", "*.password", "token", "*.token", "authorization", "cookie"],
     censor: "[redacted]",

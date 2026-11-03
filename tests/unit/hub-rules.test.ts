@@ -16,7 +16,7 @@ import {
   rfiCounts,
   rfiRag,
   stageCode,
-  utilisation,
+  utilisationFromHours,
 } from "@/domain/hub/rules";
 
 /** The Laheq Island packages of the sample workbook (Packages sheet rows 6 to 11). */
@@ -97,10 +97,15 @@ describe("RFIs, QA/QC, resources", () => {
       { status: "Answered", dueDate: "2026-10-01" },
       { status: "Closed", dueDate: "2026-10-01" },
     ];
-    expect(rfiCounts(rfis, today)).toEqual({ open: 2, closed: 1, total: 4, overdue: 1 });
+    // Workbook: RFI Closed = Closed + Answered, RFI Total = Open + Closed.
+    expect(rfiCounts(rfis, today)).toEqual({ open: 2, closed: 2, total: 4, overdue: 1 });
     expect(rfiRag(rfis[0]!, today)).toBe("Red");
     expect(rfiRag(rfis[1]!, today)).toBe("Amber");
+    expect(rfiRag(rfis[2]!, today)).toBe("Green");
     expect(rfiRag(rfis[3]!, today)).toBe("Green");
+    // A row with no status is not an open RFI, so it is Green and counts nowhere.
+    expect(rfiRag({ status: null }, today)).toBe("Green");
+    expect(rfiCounts([{ status: null }], today)).toEqual({ open: 0, closed: 0, total: 0, overdue: 0 });
   });
   it("scores a checklist", () => {
     expect(qaqcScore({ crs: "Pass", schema: "Pass", topology: "N/A", attributes: "Fail" })).toMatchObject({
@@ -113,10 +118,13 @@ describe("RFIs, QA/QC, resources", () => {
     expect(qaqcScore({}).result).toBe("Pending");
   });
   it("derives utilisation and the resources region", () => {
-    expect(utilisation(80, 60)).toBe(75);
-    expect(utilisation(0, 10)).toBeNull();
-    expect(projectUtilisation([{ plannedHours: 80, actualHours: 60 }, { plannedHours: 40, actualHours: 40 }])).toBe(88);
+    expect(utilisationFromHours(80, 60)).toBe(75);
+    expect(utilisationFromHours(0, 10)).toBeNull();
+    // Utilisation % is typed in the workbook; the average ignores the rows that leave it empty.
+    expect(projectUtilisation([{ utilisationPct: 70 }, { utilisationPct: 50 }, {}])).toBe(60);
+    expect(projectUtilisation([{}])).toBeNull();
     expect(resourcesRegion(["Dubai", "India", "South Africa"])).toBe("Mix EC Resources");
+    expect(resourcesRegion(["Dubai", "Mix EC Resources"])).toBe("Mix EC Resources");
     expect(resourcesRegion(["Dubai", "India"])).toBe("India");
     expect(resourcesRegion(["Dubai"])).toBe("Dubai");
     expect(resourcesRegion([])).toBe("-");
@@ -145,13 +153,14 @@ describe("delivery summary and dashboard", () => {
       packages: LAHEQ,
       rfis: [{ status: "Open", dueDate: "2026-10-01" }],
       risks: [{ status: "Open" }, { status: "Closed" }],
-      resources: [{ plannedHours: 10, actualHours: 6 }],
+      resources: [{ utilisationPct: 60 }],
       period: { startDate: "2026-09-07", endDate: "2026-09-20" },
       today: "2026-10-30",
     });
     expect(k).toMatchObject({
       totalProjects: 4,
-      activeProjects: 3,
+      // Workbook D6: Progressing + At Risk + On Hold (Not Started and Completed are not active).
+      activeProjects: 2,
       atRisk: 1,
       notStarted: 1,
       submissionsThisPeriod: 1,
