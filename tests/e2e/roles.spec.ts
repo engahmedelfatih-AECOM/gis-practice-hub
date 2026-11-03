@@ -95,12 +95,15 @@ test.describe("Role walk-through on the sample workbook", () => {
     await expect(page.getByLabel("Progress %")).toBeEnabled();
     await expect(page.getByLabel("Remarks")).toBeEnabled();
 
-    // The status list stops at Internal QA/QC: nothing after it is offered.
+    // The status list stops at Internal QA/QC: nothing after it is offered, except the row's
+    // current status, which stays selectable so a save does not clear it.
+    const current = await page.getByLabel(/^Status/).inputValue();
     const statuses = (await page.getByLabel(/^Status/).locator("option").allInnerTexts())
       .map((s) => s.trim())
       .filter((s) => s && !s.startsWith("Choose"))
       .sort();
-    expect(statuses).toEqual(["In Progress", "Internal QA/QC", "Not Started"]);
+    const expected = [...new Set(["In Progress", "Internal QA/QC", "Not Started", ...(current ? [current] : [])])].sort();
+    expect(statuses).toEqual(expected);
 
     const remark = `Specialist e2e ${Date.now().toString().slice(-6)}`;
     await page.getByLabel("Progress %").selectOption("60");
