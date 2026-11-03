@@ -18,6 +18,12 @@ and 10; the planner admin e-mail is still unresolved (section 10); database deci
 (section 10 and `09_Systems_Development/03_Shared/04_Database/DB_Expiry_Options_resource-planner-db.md`
 in the Project files).
 
+Revision 3 on 2026-11-03 (thread "Fix the test report findings"): the Render database was upgraded
+by the owner, the findings of TEST_AND_GAP_REPORT_2026-11-02.md were fixed on two branches
+(`fix/hub-report-2026-11-02` and `fix/planner-report-2026-11-02`), and the re-run results are in
+TEST_AND_GAP_REPORT_2026-11-03.md. Sections 8, 9, 10 and 21 updated; the work not in scope is
+listed in `docs/handover/BACKLOG.md`.
+
 Owner: Ahmed Elfatih, GIS Manager, AECOM Middle East GIS Practice (work e-mail
 ahmed.elfatih@aecom.com; GitHub organisation account engahmedelfatih-AECOM).
 
@@ -445,10 +451,39 @@ dropdown behaviour, formulas) follows the workbook.
 | 2026-11-02 | Work continues in the P10 Project thread "Continue Resource Planner and Hub handover"; this file stays the state of record | Owner's instruction |
 | 2026-11-02 | No merge of PR #8, no data wipe and no database change until the owner gives an explicit go | Owner's instruction |
 | 2026-11-02 | Database: option B chosen - one-off pg_dump of both databases from the owner's PC, then upgrade `resource-planner-db` to the smallest paid type in the Render dashboard (owner executes) | Keeps data and connection strings; first backup ever; avoids the free 30-day re-create cycle |
+| 2026-11-03 | Database: option A executed instead of option B - `resource-planner-db` upgraded in place to Basic-256mb (plan `0.1c-256mb`); no expiry date remains | The upgrade keeps the data and both connection strings, and Render then provides point-in-time recovery; the pg_dump was no longer needed first (owner's decision and action) |
+| 2026-11-03 | One off-Render copy of the database stays advised before each bulk import | Point-in-time recovery and Render exports do not cover deletion of the instance or loss of the account |
+| 2026-11-03 | Resources Utilisation % is a typed field with the workbook's dropdown (0 to 120 in tens), and the hours only suggest a value | The workbook is the specification; the derived value disagreed with the sheet (report M6) |
+| 2026-11-03 | Packages QA/QC Result and RFI No. are calculated, never stored | Both are formulas in the workbook (report m11) |
+| 2026-11-03 | A register row exists only when its key cell has a value; a formula-only or filler row is skipped and reported once per sheet | The workbook's own "#" column asks the same question (report B1, M2) |
+| 2026-11-03 | An import never guesses: a value outside a Lists list skips the row when the field is required and is cleared when it is optional, and a typed date is warned about, never parsed | No silent data change (report M3, M4) |
+| 2026-11-03 | A GIS Specialist sets a package status up to Internal QA/QC; submitting to the client and later statuses belong to the GIS Lead | GIS-STD-001 3.3 (report B3, M8) |
+| 2026-11-03 | A blank package status on import is stored as "Not Started" with a warning | The workbook treats a blank status as not started |
+| 2026-11-03 | An Updates row with no description is not a row (the sample's count goes from 12 to 11) | Same key-cell rule as every other register |
+| 2026-11-03 | The machine feed keeps a global system actor; only human sessions are region-scoped | A key belongs to a system, not to a hub (report B2) |
+| 2026-11-03 | The API key travels in the `x-api-key` header only; a key in the query string is refused with 400 | A key in a URL ends up in access logs and proxy caches (report m14) |
 
 ---
 
 ## 9. Decided but not yet built
+
+Added 2026-11-03 (from the fix branches):
+
+- RACI change waiting for the owner's go: GIS Specialist loses `qaqc:manage` (the QA/QC result is
+  the GIS Lead's R/A) and the GIS Lead keeps reading the client schema but loses
+  `clientSchema:manage` (the master tracker dictionary is the Specialist's R with the Manager
+  accountable). Reading is unchanged for both, because it comes from `hub:read`. The matrix was
+  put to the owner on 2026-11-03; nothing is changed in `permissions.ts` until he answers.
+- Merge of the two fix branches: `fix/hub-report-2026-11-02` into `gis-practice-hub` main (which
+  auto-deploys) and `fix/planner-report-2026-11-02` into `resource-planner` `split-planner`. Both
+  wait for the owner's go, as PR #8 does.
+- Five Status values on the Schema Tracker of the real workbook are not on the Lists sheet
+  ("SK to investigate requirements" three times, "Complete at 15%" twice) and one QA/QC row has no
+  package name. The import warns about each one; the team corrects the sheet.
+- Everything in `docs/handover/BACKLOG.md`: the shared project key and the planner link, the
+  incremental feed, exports in the workbook layout, Entra ID, central logging, Key Vault, the
+  AECOM server, a second database for the Hub, map tiles on the AECOM network, the dashboard
+  period as a manager-owned setting, the remaining accessibility items and the untested services.
 
 Planner:
 
@@ -505,9 +540,14 @@ Both:
   or external script first needs an IP added in the dashboard; a second free instance is refused
   while this one exists and a new free instance expires again 30 days after creation, so
   dump-and-recreate on the free plan only buys 30 days. Steps and risks of both options:
-  `DB_Expiry_Options_resource-planner-db.md` (Project files, 03_Shared/04_Database). Recommended:
-  upgrade to the smallest paid type before 2026-11-17, with a one-off pg_dump first. Decision
-  chosen by the owner on 2026-11-02: option B (pg_dump, then upgrade); execution by the owner.
+  `DB_Expiry_Options_resource-planner-db.md` (Project files, 03_Shared/04_Database).
+  **Resolved 2026-11-03.** The owner upgraded the instance in the Render dashboard to Basic-256mb
+  (plan `0.1c-256mb`); re-read through the Render connector the same day: status available, no
+  `expiresAt`, both databases and both connection strings unchanged. Render now keeps
+  point-in-time recovery (3 days on this plan) and allows manual logical exports from the Recovery
+  page, retained 7 days. Neither covers deletion of the instance or loss of the Render account, and
+  a restore always creates a new instance, so one off-Render copy before each bulk import stays
+  advised. The IP allow list is still empty, which a dashboard export does not need.
 - Hub admin seeded with engahmedelfatih@gmail.com because `SEED_ADMIN_EMAIL` was changed after the
   first boot; the seed only runs when no user exists. Fix by creating the AECOM user in-app (see
   section 9). The planner was seeded on 2026-10-20 with the `SEED_ADMIN_EMAIL` set at that time;
@@ -527,6 +567,18 @@ Both:
 - Demo account scripts (both apps) reset the demo passwords and re-grant missing roles on every
   start while `DEMO_ACCOUNTS_PASSWORD` is set, but they do not re-activate a deactivated account.
   Deactivate the demo users in-app and remove the variable on Render.
+- Fixed 2026-11-03 on the fix branches, listed here because the live services still run the old
+  code until the owner merges: the import defects (B1, M2 to M5), REGION scope on every read and
+  write (B2), the specialist progress save (B3), the feed behind the proxy (B4) and the rules that
+  disagreed with the workbook (M6, M7, M10, M11, m1 to m3).
+- Found while testing on 2026-11-03 and fixed in the same branch: a row of the Projects register
+  has no project column, so it looked practice-wide and a region-scoped lead could list and open a
+  project of another hub. The scope now uses the row's own id. An end-to-end test covers it.
+- The workbook's Projects sheet has "Dubai" typed over the formula in the GIS Resources Region cell
+  of QIC D9, while the people on the project sit in South Africa. The Hub follows the formula; the
+  team corrects the sheet. The parity test records this as the one accepted difference.
+- The Render services still run the code of `main` and `split-planner`: nothing of the 2026-11-03
+  work is deployed yet.
 - Render free services spin down after inactivity; the first request takes about a minute.
 - Hub database lives on the planner's free PostgreSQL instance (shared-instance mode), so the
   expiry above affects both applications at once. `pg_dump` before bulk imports.
@@ -1125,6 +1177,12 @@ each one rests on and what still carries a [VERIFY] marker.
 | 17 Diagram | sections 2 and 6 | high | none |
 | 18 Bundled files | docs/handover listing | high | none |
 | 19 and 20 Project texts | the rules of this session | n/a | none |
+
+Revision 3 re-check on 2026-11-03: sections 8, 9 and 10 carry the database upgrade, the business
+decisions of the fix branches and the RACI question that waits on the owner; the test results are
+in TEST_AND_GAP_REPORT_2026-11-03.md and the work not in scope in `docs/handover/BACKLOG.md`. Still
+open: the planner seeded admin e-mail (unchanged), and the merge of the two fix branches. Section 10
+now says plainly that the live services run the old code until those merges happen.
 
 Checks performed on the text: no long dash character anywhere (grep for U+2013 and U+2014 returned
 zero, also on the bundled files); no password, token, secret value or connection string appears

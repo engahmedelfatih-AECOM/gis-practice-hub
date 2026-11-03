@@ -17,8 +17,13 @@ export interface Principal {
 
 /** The resource a decision is about. Omit fields that do not apply. */
 export interface ResourceRef {
-  /** Region list item id of the row (the GIS Resources Region of a project, the hub of a person). */
+  /** Region list item id of the row (the hub of a person, one region of a project). */
   regionId?: string | null;
+  /**
+   * Region list item ids the row belongs to: a project belongs to the hubs of the people on it,
+   * so a region-scoped grant matches when one of its regions is among them.
+   */
+  regionIds?: readonly string[];
 }
 
 /**
@@ -34,8 +39,11 @@ export function can(principal: Principal, action: Action, resource?: ResourceRef
     for (const held of principal.roles) {
       if (held.role !== grant.role) continue;
       if (held.scopeType === "GLOBAL") return true;
-      if (!resource || resource.regionId === undefined) return true;
-      if (resource.regionId === held.scopeId) return true;
+      // A region-scoped grant needs a region to compare with; without one the question is only
+      // "may this user do this kind of thing at all?" (navigation and list screens).
+      if (!resource || (resource.regionId === undefined && resource.regionIds === undefined)) return true;
+      if (resource.regionId !== undefined && resource.regionId === held.scopeId) return true;
+      if (resource.regionIds !== undefined && held.scopeId !== null && resource.regionIds.includes(held.scopeId)) return true;
     }
   }
   return false;

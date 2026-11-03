@@ -4,13 +4,16 @@ import { isAppError } from "@/application/errors";
 import { logger } from "@/lib/logger";
 
 /**
- * Wrap a feed handler: API key authentication (`x-api-key` header or `?api_key=`), the
- * `hub:read` scope, JSON errors and no caching. The Resource Planner reads these feeds.
+ * Wrap a feed handler: API key authentication, the `hub:read` scope, JSON errors and no caching.
+ * The Resource Planner reads these feeds. The key travels in the `x-api-key` header only: a key
+ * in the query string would end up in every access log and proxy cache on the way.
  */
 export function feedRoute(handler: (req: NextRequest) => Promise<unknown>) {
   return async (req: NextRequest) => {
-    const key = req.headers.get("x-api-key") ?? req.nextUrl.searchParams.get("api_key");
-    const principal = await authenticateApiKey(key);
+    if (req.nextUrl.searchParams.has("api_key")) {
+      return NextResponse.json({ error: "Send the key in the x-api-key header, not in the URL." }, { status: 400 });
+    }
+    const principal = await authenticateApiKey(req.headers.get("x-api-key"));
     if (!principal) return NextResponse.json({ error: "A valid API key is required (x-api-key header)." }, { status: 401 });
     if (!principal.scopes.includes("hub:read")) return NextResponse.json({ error: "This key cannot read the hub feed." }, { status: 403 });
     try {

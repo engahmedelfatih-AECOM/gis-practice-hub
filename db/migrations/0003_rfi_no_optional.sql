@@ -1,0 +1,1 @@
+ALTER TABLE "rfi" ALTER COLUMN "rfi_no" DROP NOT NULL;

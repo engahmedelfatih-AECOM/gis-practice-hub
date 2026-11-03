@@ -18,16 +18,25 @@ export const IN_PROGRESS_STATUSES = new Set([
 ]);
 export const EC_HUBS = new Set(["India", "Romania", "South Africa"]);
 
+/** Package statuses that are no longer open for a milestone (workbook column "cls" = D or X). */
+export const CLOSED_FOR_MILESTONE = new Set(["Submitted", "Resubmitted", "Approved", "Cancelled"]);
+
 export interface PackageLike {
   designStage: string;
   discipline: string;
   dimension?: string | null;
-  status: string;
+  status: string | null;
   plannedSubmission?: IsoDate | null;
   actualSubmission?: IsoDate | null;
   approvalDate?: IsoDate | null;
   progressPct?: number | null;
   clientReviewStatus?: string | null;
+}
+
+/** Delivery Tracker column "Discipline (stage)": the workbook prints "MP - Masterplan - Plots & Parcels". */
+export function disciplineStageLabel(p: Pick<PackageLike, "designStage" | "discipline">): string {
+  const code = stageCode(p.designStage);
+  return code ? `${code} - ${p.discipline}` : p.discipline;
 }
 
 /** "DD - Detailed Design" -> "DD"; "CD 50% - Concept Design 50%" -> "CD 50%". */
@@ -46,7 +55,7 @@ export function packageLabel(p: PackageLike): string {
 /** Projects column "GIS Delivered / Approved": delivered packages with their status. */
 export function deliveredText(packages: PackageLike[]): string {
   return packages
-    .filter((p) => DELIVERED_STATUSES.has(p.status))
+    .filter((p) => p.status !== null && DELIVERED_STATUSES.has(p.status))
     .map((p) => `${packageLabel(p)} - ${p.status}`)
     .join("; ");
 }
@@ -54,7 +63,7 @@ export function deliveredText(packages: PackageLike[]): string {
 /** Projects column "GIS In Progress": active packages that are not delivered. */
 export function inProgressText(packages: PackageLike[]): string {
   return packages
-    .filter((p) => IN_PROGRESS_STATUSES.has(p.status))
+    .filter((p) => p.status === null || IN_PROGRESS_STATUSES.has(p.status))
     .map((p) => packageLabel(p))
     .join("; ");
 }
@@ -111,9 +120,8 @@ export interface Milestone {
  */
 export function nextMilestone(packages: PackageLike[], override: string | null | undefined): Milestone {
   if (override && override.trim()) return { text: override.trim(), date: null };
-  const open = packages.filter(
-    (p) => p.plannedSubmission && p.status !== "Approved" && p.status !== "Cancelled",
-  );
+  // The workbook only considers packages that are still to be delivered (column "cls" = P).
+  const open = packages.filter((p) => p.plannedSubmission && !(p.status !== null && CLOSED_FOR_MILESTONE.has(p.status)));
   if (!open.length) return { text: "-", date: null };
   const next = open.reduce((a, b) => (b.plannedSubmission! < a.plannedSubmission! ? b : a));
   return {
@@ -138,19 +146,26 @@ export function submissionsInPeriod(packages: PackageLike[], start: IsoDate, end
 }
 
 export interface RfiLike {
-  status: string;
+  status: string | null;
   dueDate?: IsoDate | null;
 }
+
+/** RFI statuses the workbook counts as closed (RFI Closed = Closed + Answered). */
+export const RFI_CLOSED_STATUSES = new Set(["Closed", "Answered"]);
 
 export function rfiOverdue(r: RfiLike, today: IsoDate): boolean {
   return r.status === "Open" && Boolean(r.dueDate) && r.dueDate! < today;
 }
 
-/** RFI RAG: Closed is Green, overdue is Red, everything else still open is Amber. */
+/** RFI RAG as the workbook: only an open RFI is Amber (Red when overdue); anything else is Green. */
 export function rfiRag(r: RfiLike, today: IsoDate): "Green" | "Amber" | "Red" {
-  if (r.status === "Closed") return "Green";
-  if (rfiOverdue(r, today)) return "Red";
-  return "Amber";
+  if (r.status !== "Open") return "Green";
+  return rfiOverdue(r, today) ? "Red" : "Amber";
+}
+
+/** RFI No. as the workbook calculates it: the running number of the RFIs of one project. */
+export function rfiNumber(index: number): string {
+  return `RFI-${String(index).padStart(3, "0")}`;
 }
 
 export interface RfiCounts {
@@ -160,13 +175,11 @@ export interface RfiCounts {
   overdue: number;
 }
 
+/** RFI tiles as the workbook: Total is Open + Closed, so a row with no status counts nowhere. */
 export function rfiCounts(rfis: RfiLike[], today: IsoDate): RfiCounts {
-  return {
-    open: rfis.filter((r) => r.status === "Open").length,
-    closed: rfis.filter((r) => r.status === "Closed").length,
-    total: rfis.length,
-    overdue: rfis.filter((r) => rfiOverdue(r, today)).length,
-  };
+  const open = rfis.filter((r) => r.status === "Open").length;
+  const closed = rfis.filter((r) => r.status !== null && RFI_CLOSED_STATUSES.has(r.status)).length;
+  return { open, closed, total: open + closed, overdue: rfis.filter((r) => rfiOverdue(r, today)).length };
 }
 
 export interface QaqcScore {
@@ -189,8 +202,11 @@ export function qaqcScore(checks: Record<string, string | null | undefined>): Qa
   return { passes, fails, applicable, score, result };
 }
 
-/** Resources Utilisation %: actual over planned hours (null when no plan). */
-export function utilisation(planned: number | null | undefined, actual: number | null | undefined): number | null {
+/**
+ * Resources Utilisation % is typed in the workbook (dropdown 0 to 120 %), so the Hub stores it.
+ * This helper only suggests a value from the hours when the cell is empty; it never overwrites one.
+ */
+export function utilisationFromHours(planned: number | null | undefined, actual: number | null | undefined): number | null {
   if (!planned || planned <= 0) return null;
   return Math.round(((actual ?? 0) / planned) * 100);
 }
@@ -203,16 +219,16 @@ export function utilisation(planned: number | null | undefined, actual: number |
 export function resourcesRegion(hubs: (string | null | undefined)[]): string {
   const set = new Set(hubs.filter((h): h is string => Boolean(h)).map((h) => h.trim()));
   const ec = [...set].filter((h) => EC_HUBS.has(h));
-  if (ec.length > 1) return "Mix EC Resources";
+  // The workbook returns Mix as soon as one row says "Mix EC Resources", or two EC hubs are used.
+  if (set.has("Mix EC Resources") || ec.length > 1) return "Mix EC Resources";
   if (ec.length === 1) return ec[0]!;
   if (set.has("Dubai")) return "Dubai";
-  if (set.has("Mix EC Resources")) return "Mix EC Resources";
   return "-";
 }
 
-/** Average utilisation of the people on a project (null when none has a plan). */
-export function projectUtilisation(rows: { plannedHours?: number | null; actualHours?: number | null }[]): number | null {
-  const u = rows.map((r) => utilisation(r.plannedHours, r.actualHours)).filter((v): v is number => v !== null);
+/** Average of the typed Utilisation % cells (AVERAGEIFS of the workbook: blanks are ignored). */
+export function projectUtilisation(rows: { utilisationPct?: number | null }[]): number | null {
+  const u = rows.map((r) => r.utilisationPct).filter((v): v is number => v !== null && v !== undefined);
   return u.length ? Math.round(u.reduce((a, b) => a + b, 0) / u.length) : null;
 }
 
@@ -247,10 +263,11 @@ export function deliverySummary(packages: PackageLike[]): DeliverySummary {
     (p) => p.status === "Approved" || p.clientReviewStatus === "Approved" || p.clientReviewStatus === "Approved in Principle",
   ).length;
   const submitted = packages.filter((p) => p.status === "Submitted" || p.status === "Resubmitted").length;
-  const inProgress = packages.filter((p) => ["In Progress", "Internal QA/QC", "Client Comments", "On Hold"].includes(p.status)).length;
+  const inProgress = packages.filter((p) => ["In Progress", "Internal QA/QC", "Client Comments", "On Hold"].includes(p.status ?? "")).length;
   const notStarted = packages.filter((p) => p.status === "Not Started").length;
-  const progress = packages.map((p) => p.progressPct ?? 0);
-  const overallProgress = total ? Math.round(progress.reduce((a, b) => a + b, 0) / total) : 0;
+  // AVERAGE of the workbook ignores empty progress cells; a blank is not a zero.
+  const progress = packages.map((p) => p.progressPct).filter((v): v is number => v !== null && v !== undefined);
+  const overallProgress = progress.length ? Math.round(progress.reduce((a, b) => a + b, 0) / progress.length) : 0;
   return { total, approved, submitted, inProgress, notStarted, overallProgress };
 }
 
@@ -269,17 +286,18 @@ export interface DashboardKpis {
   openClientComments: number;
   openRfis: number;
   overdueRfis: number;
-  teamUtilisation: number | null;
+  /** Workbook E10: AVERAGE of the typed Utilisation % cells, 0 when none is filled. */
+  teamUtilisation: number;
   openRisks: number;
 }
 
-/** Dashboard tiles for the selected period. Active = every project not Completed or On Hold. */
+/** Dashboard tiles for the selected period. Active = Progressing + At Risk + On Hold (workbook D6). */
 export function dashboardKpis(input: {
   projects: (ProjectLike & { crsOpen?: number })[];
   packages: PackageLike[];
   rfis: RfiLike[];
   risks: { status: string }[];
-  resources: { plannedHours?: number | null; actualHours?: number | null }[];
+  resources: { utilisationPct?: number | null }[];
   period: PeriodLike;
   today: IsoDate;
 }): DashboardKpis {
@@ -287,7 +305,7 @@ export function dashboardKpis(input: {
   const rfi = rfiCounts(input.rfis, input.today);
   return {
     totalProjects: input.projects.length,
-    activeProjects: input.projects.filter((p) => p.status !== "Completed" && p.status !== "On Hold").length,
+    activeProjects: byStatus("Progressing") + byStatus("At Risk") + byStatus("On Hold"),
     notStarted: byStatus("Not Started"),
     atRisk: byStatus("At Risk"),
     onHold: byStatus("On Hold"),
@@ -296,9 +314,62 @@ export function dashboardKpis(input: {
     openClientComments: input.projects.reduce((s, p) => s + (p.crsOpen ?? 0), 0),
     openRfis: rfi.open,
     overdueRfis: rfi.overdue,
-    teamUtilisation: projectUtilisation(input.resources),
+    teamUtilisation: projectUtilisation(input.resources) ?? 0,
     openRisks: input.risks.filter((r) => r.status === "Open").length,
   };
+}
+
+/** Dashboard table "Packages by status" of the workbook, in sheet order. */
+export const PACKAGE_STATUS_ORDER = [
+  "Not Started",
+  "In Progress",
+  "Internal QA/QC",
+  "Submitted",
+  "Client Comments",
+  "Resubmitted",
+  "Approved",
+  "On Hold",
+  "Cancelled",
+] as const;
+
+/** Dashboard table "Resources by hub" of the workbook, in sheet order. */
+export const HUB_ORDER = ["Dubai", "India", "Romania", "South Africa", "Mix EC Resources"] as const;
+
+export interface CountRow {
+  label: string;
+  count: number;
+  share: number;
+}
+
+function countRows(labels: readonly string[], values: (string | null | undefined)[]): CountRow[] {
+  const rows = labels.map((label) => ({ label, count: values.filter((v) => v === label).length, share: 0 }));
+  const total = rows.reduce((a, b) => a + b.count, 0);
+  return rows.map((r) => ({ ...r, share: total ? r.count / total : 0 }));
+}
+
+export function packagesByStatus(packages: PackageLike[]): CountRow[] {
+  return countRows(PACKAGE_STATUS_ORDER, packages.map((p) => p.status));
+}
+
+export function resourcesByHub(resources: { hub?: string | null }[]): CountRow[] {
+  return countRows(HUB_ORDER, resources.map((r) => r.hub));
+}
+
+export interface QaqcLike {
+  discipline?: string | null;
+  checks: Record<string, string | null | undefined>;
+}
+
+/**
+ * Packages column "QA/QC Result" as the workbook calculates it: Fail when a checklist of the same
+ * project and discipline failed, Pass when one passed, "-" when there is none.
+ */
+export function packageQaqcResult(discipline: string | null | undefined, checklists: QaqcLike[]): string {
+  const mine = checklists.filter((q) => (q.discipline ?? "") === (discipline ?? ""));
+  const results = mine.map((q) => qaqcScore(q.checks).result);
+  if (results.includes("Fail")) return "Fail";
+  if (results.includes("Pass")) return "Pass";
+  return "-";
 }
 
 /** Today in ISO form (UTC). Kept here so the whole domain has one definition. */

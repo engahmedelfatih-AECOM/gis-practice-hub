@@ -3,7 +3,7 @@ import { and, count, eq, sql, type SQL } from "drizzle-orm";
 import type { PgColumn, PgTable } from "drizzle-orm/pg-core";
 import { db, type Tx } from "@/infrastructure/db/client";
 import { logger } from "@/lib/logger";
-import { conflict, isAppError, notFound } from "@/application/errors";
+import { conflict, isAppError, isExpected, notFound } from "@/application/errors";
 import { translateDbError } from "./db-errors";
 import type { Page, Pagination } from "@/domain/shared/schema";
 
@@ -18,6 +18,8 @@ export async function withTx<T>(fn: (tx: Tx) => Promise<T>): Promise<T> {
     if (isAppError(err)) throw err;
     const translated = translateDbError(err);
     if (translated) throw translated;
+    // A sentinel that rolls back on purpose (the import dry run) is not a failure.
+    if (isExpected(err)) throw err;
     logger.error({ err }, "unhandled database error");
     throw err;
   }

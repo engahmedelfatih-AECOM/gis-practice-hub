@@ -142,6 +142,13 @@ export function Shell({
 
   return (
     <div className="flex min-h-screen flex-col">
+      {/* Keyboard users reach the page content without walking the whole navigation first. */}
+      <a
+        href="#main"
+        className="bg-surface text-brand-primary focus:ring-brand-primary sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:rounded-md focus:px-3 focus:py-2 focus:ring-2"
+      >
+        Skip to content
+      </a>
       <header className="bg-brand-primary sticky top-0 z-30 flex h-14 items-center gap-3 px-4 text-white">
         <button
           type="button"
@@ -196,7 +203,7 @@ export function Shell({
             </aside>
           </div>
         ) : null}
-        <main className="bg-surface-muted min-w-0 flex-1 px-4 py-6 sm:px-6 lg:px-8">
+        <main id="main" className="bg-surface-muted min-w-0 flex-1 px-4 py-6 sm:px-6 lg:px-8">
           {children}
         </main>
       </div>

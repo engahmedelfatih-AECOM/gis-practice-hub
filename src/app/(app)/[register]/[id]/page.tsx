@@ -30,7 +30,7 @@ export async function EditRowBody({ def, id }: { def: RegisterDef; id: string })
   return guarded(async () => {
     const actor = await requireActor();
     const [row, sources, history] = await Promise.all([getRow(actor, def.key, id), formSources(def), can(actor, "audit:read") ? historyFor(ENTITY_TYPE[def.key], id) : Promise.resolve([])]);
-    const { fields, readOnly } = editableFields(actor, def);
+    const { fields, readOnly, options } = editableFields(actor, def);
     const canEdit = can(actor, def.manage) || (def.plan ? can(actor, def.plan) : false);
     const canDelete = can(actor, def.plan ?? def.manage);
     const name = String(row[def.nameField] ?? def.label);
@@ -48,6 +48,7 @@ export async function EditRowBody({ def, id }: { def: RegisterDef; id: string })
                     values={row}
                     sources={sources}
                     readOnly={readOnly}
+                    options={options}
                     hidden={{ __register: def.key, id: row.id, version: String(row.version) }}
                     submitLabel="Save"
                     cancelHref={def.key === "projects" ? `/projects/${row.id}` : def.path}

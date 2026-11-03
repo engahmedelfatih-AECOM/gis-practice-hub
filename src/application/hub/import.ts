@@ -1,5 +1,6 @@
 import "server-only";
 import ExcelJS from "exceljs";
+import JSZip from "jszip";
 import { and, asc, eq, desc } from "drizzle-orm";
 import { z } from "zod";
 import { LIST_KEYS, LIST_KEY_VALUES, type ListKey } from "@/domain/shared/enums";
@@ -39,21 +40,32 @@ import { createDefaultWorkflow } from "./registers";
 
 type Cell = string | number | boolean | Date | null;
 
+/**
+ * The value of a cell as the team sees it in Excel: the cached result of a formula, the text of a
+ * rich-text or hyperlink cell, and null for everything with no value (an empty cell, an error, or
+ * a formula whose result the file does not carry). Never produces "[object Object]".
+ */
 function cellValue(c: ExcelJS.Cell | undefined): Cell {
   if (!c) return null;
   let v: unknown = c.value;
-  if (v && typeof v === "object") {
-    if ("result" in v) v = (v as { result: unknown }).result;
+  for (let depth = 0; depth < 4 && v && typeof v === "object" && !(v instanceof Date); depth++) {
+    if ("error" in v) v = null;
+    else if ("result" in v) v = (v as { result: unknown }).result;
     else if ("richText" in v) v = (v as { richText: { text: string }[] }).richText.map((t) => t.text).join("");
     else if ("text" in v) v = (v as { text: string }).text;
     else if ("hyperlink" in v) v = (v as { hyperlink: string }).hyperlink;
-    else if ("error" in v) v = null;
+    // A formula the file stores without a cached result has no value to import.
+    else v = null;
   }
-  if (v === undefined || v === null) return null;
-  if (v instanceof Date) return v;
+  if (v === undefined || v === null || typeof v === "object") return v instanceof Date ? v : null;
   if (typeof v === "number" || typeof v === "boolean") return v;
   const s = String(v).trim();
   return s === "" ? null : s;
+}
+
+/** Empty for the purpose of "does this sheet row exist": nothing, or the workbook's "-" placeholder. */
+function isBlank(v: Cell): boolean {
+  return v === null || (typeof v === "string" && (v === "" || v === "-"));
 }
 
 function asIso(v: Cell): string | null {
@@ -87,6 +99,52 @@ function norm(s: unknown): string {
     .toLowerCase();
 }
 
+/**
+ * Headers of the workbook that the Hub calculates itself or that are helper columns of the sheet.
+ * They are not reported as ignored columns, because nothing is lost by not reading them.
+ */
+const IGNORED_HEADERS = new Set(
+  [
+    "#",
+    "cls",
+    "key",
+    "label",
+    "mdate",
+    "mkey",
+    "stg",
+    "pkey",
+    "discipline group",
+    "days overdue",
+    "overdue",
+    "score",
+    "result",
+    "crs total",
+    "rfi open",
+    "rfi closed",
+    "rfi total",
+    "gis delivered / approved",
+    "gis in progress",
+    "gis resources region",
+    "next milestone",
+    "next milestone date",
+    "utilisation %",
+    "bucket",
+    "rag",
+    "open",
+    "submissions this period",
+    "report sheet",
+    "open report",
+    "report period",
+    "qa/qc result",
+    "rfi no.",
+    "india",
+    "romania",
+    "south africa",
+    "dubai",
+    "mix",
+  ].map((h) => h.toLowerCase()),
+);
+
 function headerMap(ws: ExcelJS.Worksheet, row: number): Map<string, number> {
   const map = new Map<string, number>();
   ws.getRow(row).eachCell({ includeEmpty: false }, (cell, col) => {
@@ -104,6 +162,16 @@ export interface ParsedRegister {
   found: boolean;
   rows: Record<string, unknown>[];
   warnings: string[];
+  /** Sheet rows that carried data but were left out, with the reason (counted in the summary). */
+  skipped: number;
+}
+
+/** At most this many warning lines are kept; the rest are summarised in one line. */
+const MAX_WARNINGS = 200;
+
+function addWarning(list: string[], line: string): void {
+  if (list.length < MAX_WARNINGS) list.push(line);
+  else if (list.length === MAX_WARNINGS) list.push("More warnings were found; fix these first and run the dry run again.");
 }
 
 export interface ParsedWorkbook {
@@ -116,11 +184,15 @@ export interface ParsedWorkbook {
 }
 
 function parseField(f: FieldDef, raw: Cell, warnings: string[], where: string): unknown {
-  if (raw === null) return f.type === "int" || f.type === "pct" ? 0 : null;
+  if (raw === null) return f.type === "int" ? 0 : null;
   switch (f.type) {
     case "date": {
       const d = asIso(raw);
-      if (!d) warnings.push(`${where}: "${asText(raw)}" is not a date for ${f.label}; left empty.`);
+      if (!d)
+        addWarning(
+          warnings,
+          `${where}: ${f.label} "${asText(raw)}" is not a date (use dd-mmm-yyyy, as in the workbook); left empty.`,
+        );
       return d;
     }
     case "number":
@@ -128,8 +200,19 @@ function parseField(f: FieldDef, raw: Cell, warnings: string[], where: string): 
     case "int":
       return typeof raw === "number" ? Math.round(raw) : Math.round(Number(String(raw).replace(/[^0-9.-]/g, "")) || 0);
     case "pct": {
-      const n = typeof raw === "number" ? raw : Number(String(raw).replace(/[^0-9.-]/g, "")) || 0;
-      return Math.max(0, Math.min(100, Math.round(n <= 1 ? n * 100 : n)));
+      // The workbook stores percentages as fractions (0.7 = 70 %); 0 to 1 is read as a fraction.
+      const max = f.max ?? 100;
+      const n = typeof raw === "number" ? raw : Number(String(raw).replace(/[^0-9.-]/g, ""));
+      if (!Number.isFinite(n)) {
+        addWarning(warnings, `${where}: ${f.label} "${asText(raw)}" is not a percentage; left empty.`);
+        return null;
+      }
+      const pct = Math.round(n > 0 && n <= 1 ? n * 100 : n);
+      if (pct < 0 || pct > max) {
+        addWarning(warnings, `${where}: ${f.label} ${pct} % is outside 0 to ${max} %; left empty.`);
+        return null;
+      }
+      return pct;
     }
     case "project":
       return asText(raw);
@@ -140,7 +223,7 @@ function parseField(f: FieldDef, raw: Cell, warnings: string[], where: string): 
 
 function parseRegister(wb: ExcelJS.Workbook, def: RegisterDef, warnings: string[]): ParsedRegister {
   const ws = wb.getWorksheet(def.sheet);
-  const out: ParsedRegister = { key: def.key, sheet: def.sheet, found: Boolean(ws), rows: [], warnings: [] };
+  const out: ParsedRegister = { key: def.key, sheet: def.sheet, found: Boolean(ws), rows: [], warnings: [], skipped: 0 };
   if (!ws) return out;
   const headers = headerMap(ws, 5);
   const cols = new Map<string, number>();
@@ -152,20 +235,29 @@ function parseRegister(wb: ExcelJS.Workbook, def: RegisterDef, warnings: string[
   const reportPeriodCol = def.key === "updates" ? headers.get("report period") : undefined;
   // Projects: the "Report Sheet" column names the update sheet (workflow and apps live there).
   const reportSheetCol = def.key === "projects" ? headers.get("report sheet") : undefined;
+  // Rows left out because their key cells are empty: one summary line per sheet, not one per row.
+  const keyless: number[] = [];
   for (let r = 6; r <= ws.rowCount; r++) {
     const row = ws.getRow(r);
-    const flat: Record<string, unknown> = {};
-    let hasValue = false;
+    const raws = new Map<string, Cell>();
     for (const f of def.fields) {
       const col = cols.get(f.key);
-      const raw = col ? cellValue(row.getCell(col)) : null;
-      if (raw !== null && raw !== "" && !(typeof raw === "number" && raw === 0 && (f.type === "int" || f.type === "pct"))) hasValue = true;
-      flat[f.key] = parseField(f, raw, out.warnings, `${def.sheet} row ${r}`);
+      raws.set(f.key, col ? cellValue(row.getCell(col)) : null);
     }
-    const name = flat[def.nameField];
-    const projectRef = flat.projectId ?? flat.projectLabel;
-    if (!hasValue) continue;
-    if (!name && !projectRef) continue;
+    // Does this sheet row exist? The workbook asks the same question in its own "#" column.
+    const exists = def.rowKey.some((k) => !isBlank(raws.get(k) ?? null));
+    if (!exists) {
+      // A row with no key but with data in other cells is reported, never half-imported.
+      if ([...raws.values()].some((v) => !isBlank(v))) {
+        out.skipped++;
+        keyless.push(r);
+      }
+      continue;
+    }
+    const flat: Record<string, unknown> = { __row: r };
+    for (const f of def.fields) {
+      flat[f.key] = parseField(f, raws.get(f.key) ?? null, out.warnings, `${def.sheet} row ${r}`);
+    }
     if (def.key === "updates" && !flat.periodFrom && reportPeriodCol) {
       const txt = asText(cellValue(row.getCell(reportPeriodCol)));
       const m = txt?.match(/^(\d{2}-[A-Za-z]{3}-\d{4}) to (\d{2}-[A-Za-z]{3}-\d{4})$/);
@@ -175,14 +267,31 @@ function parseRegister(wb: ExcelJS.Workbook, def: RegisterDef, warnings: string[
       }
     }
     if (def.key === "updates" && !flat.periodFrom) {
-      out.warnings.push(`Updates row ${r}: no period; row skipped.`);
+      out.skipped++;
+      addWarning(out.warnings, `Updates row ${r}: no period; row skipped.`);
       continue;
     }
     if (reportSheetCol) flat.__reportSheet = asText(cellValue(row.getCell(reportSheetCol)));
     out.rows.push(flat);
   }
-  const missing = def.fields.filter((f) => !cols.has(f.key) && !["latitude", "longitude", "locationLabel", "periodFrom", "periodTo", "meetingDate"].includes(f.key));
-  if (missing.length) warnings.push(`${def.sheet}: columns not found and left empty: ${missing.map((f) => f.label).join(", ")}.`);
+  if (keyless.length) {
+    const keyLabels = def.rowKey.map((k) => def.fields.find((f) => f.key === k)?.label ?? k).join(" and ");
+    const range = keyless.length === 1 ? `row ${keyless[0]}` : `rows ${keyless[0]} to ${keyless[keyless.length - 1]}`;
+    addWarning(
+      out.warnings,
+      `${def.sheet}: ${keyless.length} ${keyless.length === 1 ? "row" : "rows"} skipped because ${keyLabels} is empty (${range}); these are formula or filler rows of the sheet.`,
+    );
+  }
+  const missing = def.fields.filter(
+    (f) =>
+      !f.derived &&
+      !cols.has(f.key) &&
+      !["latitude", "longitude", "locationLabel", "periodFrom", "periodTo", "meetingDate"].includes(f.key),
+  );
+  if (missing.length) addWarning(warnings, `${def.sheet}: columns not found and left empty: ${missing.map((f) => f.label).join(", ")}.`);
+  const extra = [...headers.keys()].filter((h) => ![...cols.keys()].some((k) => norm(def.fields.find((f) => f.key === k)?.label ?? "") === h));
+  const ignored = extra.filter((h) => !IGNORED_HEADERS.has(h));
+  if (ignored.length) addWarning(warnings, `${def.sheet}: columns the Hub does not use were ignored: ${ignored.join(", ")}.`);
   return out;
 }
 
@@ -264,9 +373,47 @@ function parseReportSheet(ws: ExcelJS.Worksheet | undefined) {
   return { steps, apps };
 }
 
-export async function parseHubWorkbook(buffer: ArrayBuffer | Buffer): Promise<ParsedWorkbook> {
+/**
+ * Pictures and charts of a workbook that was last saved by a tool other than Excel (openpyxl,
+ * Google Sheets, LibreOffice) can carry drawing parts the reader cannot reconcile. Nothing the
+ * Hub imports lives in a drawing, so a retry drops those parts and reads the data.
+ */
+async function withoutDrawings(buffer: ArrayBuffer | Buffer): Promise<Buffer> {
+  const zip = await JSZip.loadAsync(buffer as never);
+  const drop = Object.keys(zip.files).filter((n) => /^xl\/(drawings|charts|media)\//.test(n));
+  for (const name of drop) zip.remove(name);
+  for (const name of Object.keys(zip.files)) {
+    if (!/^xl\/(worksheets\/.*\.xml|worksheets\/_rels\/.*|_rels\/.*)$|^\[Content_Types\]\.xml$/.test(name)) continue;
+    const xml = await zip.file(name)!.async("string");
+    const clean = xml
+      .replace(/<(?:\w+:)?(drawing|legacyDrawing|legacyDrawingHF|picture)\b[^>]*\/>/g, "")
+      .replace(/<Relationship\b[^>]*(?:drawings|charts|media)\/[^>]*\/>/g, "")
+      .replace(/<Override\b[^>]*PartName="\/xl\/(?:drawings|charts)\/[^>]*\/>/g, "");
+    if (clean !== xml) zip.file(name, clean);
+  }
+  return zip.generateAsync({ type: "nodebuffer" });
+}
+
+async function loadWorkbook(buffer: ArrayBuffer | Buffer): Promise<ExcelJS.Workbook> {
   const wb = new ExcelJS.Workbook();
-  await wb.xlsx.load(buffer as never);
+  try {
+    await wb.xlsx.load(buffer as never);
+    return wb;
+  } catch (first) {
+    try {
+      const retry = new ExcelJS.Workbook();
+      await retry.xlsx.load((await withoutDrawings(buffer)) as never);
+      return retry;
+    } catch {
+      throw validation(
+        `This file could not be read as an Excel workbook (${first instanceof Error ? first.message : "unknown error"}). Open it in Excel, save it as .xlsx and upload it again.`,
+      );
+    }
+  }
+}
+
+export async function parseHubWorkbook(buffer: ArrayBuffer | Buffer): Promise<ParsedWorkbook> {
+  const wb = await loadWorkbook(buffer);
   const warnings: string[] = [];
   const registers = REGISTER_KEYS.map((k) => parseRegister(wb, REGISTERS[k], warnings));
   const { lists, periods } = parseLists(wb, warnings);
@@ -280,6 +427,12 @@ export async function parseHubWorkbook(buffer: ArrayBuffer | Buffer): Promise<Pa
     if (parsed.apps.length) apps.set(p.name as string, parsed.apps);
   }
   if (!projects.found) throw validation("This file has no Projects sheet. Upload the GIS_Practice_Hub workbook.");
+  const known = new Set([...REGISTER_KEYS.map((k) => norm(REGISTERS[k].sheet)), norm("Lists")]);
+  const reportSheets = new Set(projects.rows.map((p) => norm((p.__reportSheet as string | null) ?? (p.name as string))));
+  const other = wb.worksheets
+    .map((w) => w.name)
+    .filter((n) => !known.has(norm(n)) && !reportSheets.has(norm(n)) && !/^(home|dashboard|delivery tracker|report template)$/i.test(n.trim()));
+  if (other.length) addWarning(warnings, `Sheets the Hub does not read were ignored: ${other.join(", ")}.`);
   return { registers, lists, periods, workflows, apps, warnings };
 }
 
@@ -287,7 +440,7 @@ export async function parseHubWorkbook(buffer: ArrayBuffer | Buffer): Promise<Pa
 
 export interface ImportSummary {
   dryRun: boolean;
-  registers: { key: RegisterKey; sheet: string; found: boolean; rows: number; inserted: number; updated: number }[];
+  registers: { key: RegisterKey; sheet: string; found: boolean; rows: number; inserted: number; updated: number; skipped: number }[];
   lists: number;
   periods: number;
   workflows: number;
@@ -310,8 +463,59 @@ function keyOf(def: RegisterDef, row: Record<string, unknown>): string {
   return def.naturalKey.map((k) => norm(row[k])).join("|");
 }
 
+/**
+ * Allowed values of every strict dropdown, from the lists of the workbook merged with the lists
+ * already in the Hub. A strict dropdown is one the workbook itself refuses to type into
+ * (showErrorMessage), so a value outside the list is an error in the file, not a new value.
+ */
+async function allowedValues(tx: Tx, parsed: ParsedWorkbook): Promise<Map<ListKey, Set<string>>> {
+  const rows = await tx.select({ listKey: listItem.listKey, value: listItem.value }).from(listItem);
+  const out = new Map<ListKey, Set<string>>();
+  const add = (key: ListKey, value: string) => {
+    const set = out.get(key) ?? new Set<string>();
+    set.add(norm(value));
+    out.set(key, set);
+  };
+  for (const r of rows) add(r.listKey as ListKey, r.value);
+  for (const l of parsed.lists) for (const v of l.values) add(l.key, v.value);
+  return out;
+}
+
+/**
+ * Check the strict dropdowns of one row. A value outside the list is never stored: the cell is
+ * left empty and a warning names it, and when the column is required the whole row is reported
+ * and left out, so a wrong value can never hide inside a register.
+ */
+function checkStrict(
+  def: RegisterDef,
+  flat: Record<string, unknown>,
+  allowed: Map<ListKey, Set<string>>,
+  warnings: string[],
+): { skip: boolean } {
+  let skip = false;
+  const where = `${def.sheet} row ${flat.__row}`;
+  for (const f of def.fields) {
+    if (!f.strict || f.derived) continue;
+    const v = flat[f.key];
+    if (v === null || v === undefined || v === "") continue;
+    const list = f.options ? new Set(f.options.map((o) => norm(o))) : f.list ? allowed.get(f.list) : null;
+    if (!list || !list.size) continue;
+    if (list.has(norm(v))) continue;
+    const shown = f.options ? [...f.options].join(", ") : "the list on the Lists sheet";
+    if (f.required) {
+      skip = true;
+      addWarning(warnings, `${where}: ${f.label} "${String(v)}" is not one of ${shown}; row skipped.`);
+    } else {
+      flat[f.key] = null;
+      addWarning(warnings, `${where}: ${f.label} "${String(v)}" is not one of ${shown}; left empty.`);
+    }
+  }
+  return { skip };
+}
+
 async function applyHub(tx: Tx, parsed: ParsedWorkbook, dryRun: boolean): Promise<ImportSummary> {
   const summary: ImportSummary = { dryRun, registers: [], lists: 0, periods: 0, workflows: 0, warnings: [...parsed.warnings] };
+  for (const reg of parsed.registers) for (const w of reg.warnings) addWarning(summary.warnings, w);
 
   // Lists: upsert values in sheet order, keep extra values already in the app.
   for (const l of parsed.lists) {
@@ -341,11 +545,17 @@ async function applyHub(tx: Tx, parsed: ParsedWorkbook, dryRun: boolean): Promis
   const projectsParsed = parsed.registers.find((r) => r.key === "projects")!;
   const existingProjects = await tx.select().from(project);
   const projectIdByName = new Map(existingProjects.map((p) => [norm(p.name), p.id]));
+  const allowed = await allowedValues(tx, parsed);
   let inserted = 0;
   let updated = 0;
+  let projectsSkipped = projectsParsed.skipped;
   for (let i = 0; i < projectsParsed.rows.length; i++) {
     const flat = { ...projectsParsed.rows[i]! };
     delete flat.__reportSheet;
+    if (checkStrict(REGISTERS.projects, flat, allowed, summary.warnings).skip) {
+      projectsSkipped++;
+      continue;
+    }
     const values = { ...splitJson(REGISTERS.projects, flat), sortOrder: i + 1 } as Record<string, unknown>;
     if (!values.status) values.status = "Not Started";
     const id = projectIdByName.get(norm(flat.name));
@@ -354,23 +564,42 @@ async function applyHub(tx: Tx, parsed: ParsedWorkbook, dryRun: boolean): Promis
       if (!dryRun) await tx.update(project).set(values as never).where(eq(project.id, id));
     } else {
       inserted++;
-      if (!dryRun) {
+      if (dryRun) {
+        // The dry run must see the projects of the file, or every other sheet would look unmatched.
+        projectIdByName.set(norm(flat.name), `dry-${norm(flat.name)}`);
+      } else {
         const [row] = await tx.insert(project).values(values as never).returning({ id: project.id });
         projectIdByName.set(norm(flat.name), row!.id);
         await createDefaultWorkflow(tx, row!.id);
       }
     }
   }
-  summary.registers.push({ key: "projects", sheet: "Projects", found: projectsParsed.found, rows: projectsParsed.rows.length, inserted, updated });
+  summary.registers.push({
+    key: "projects",
+    sheet: "Projects",
+    found: projectsParsed.found,
+    rows: projectsParsed.rows.length - (projectsSkipped - projectsParsed.skipped),
+    inserted,
+    updated,
+    skipped: projectsSkipped,
+  });
+  // Projects in the Hub that the file does not mention are left untouched, but the team is told.
+  const inFile = new Set(projectsParsed.rows.map((r) => norm(r.name)));
+  const missingFromFile = existingProjects.filter((p) => !inFile.has(norm(p.name))).map((p) => p.name);
+  if (missingFromFile.length)
+    addWarning(
+      summary.warnings,
+      `In the Hub but not on the Projects sheet, so left unchanged (rename in the Hub, not in the file): ${missingFromFile.join(", ")}.`,
+    );
 
   const ensureProject = async (name: string | null): Promise<string | null> => {
     if (!name) return null;
     const id = projectIdByName.get(norm(name));
     if (id) return id;
-    summary.warnings.push(`Project "${name}" is not on the Projects sheet; it was created with status Not Started.`);
+    addWarning(summary.warnings, `Project "${name}" is not on the Projects sheet; it was created with status Not Started.`);
     if (dryRun) {
-      projectIdByName.set(norm(name), `dry-${name}`);
-      return `dry-${name}`;
+      projectIdByName.set(norm(name), `dry-${norm(name)}`);
+      return `dry-${norm(name)}`;
     }
     const [row] = await tx.insert(project).values({ name, status: "Not Started", sortOrder: projectIdByName.size + 1 }).returning({ id: project.id });
     projectIdByName.set(norm(name), row!.id);
@@ -386,17 +615,33 @@ async function applyHub(tx: Tx, parsed: ParsedWorkbook, dryRun: boolean): Promis
     const byKey = new Map(existing.map((e) => [keyOf(def, e), e]));
     let ins = 0;
     let upd = 0;
+    let skipped = reg.skipped;
+    let position = 0;
     for (let i = 0; i < reg.rows.length; i++) {
       const flat = { ...reg.rows[i]! };
+      if (checkStrict(def, flat, allowed, summary.warnings).skip) {
+        skipped++;
+        continue;
+      }
       if ("projectId" in flat) flat.projectId = await ensureProject(flat.projectId as string | null);
       if (reg.key === "schema") {
         const label = flat.projectLabel as string;
         flat.projectId = projectIdByName.get(norm(label)) ?? null;
         if (String(flat.projectId).startsWith("dry-")) flat.projectId = null;
       }
-      const values = { ...splitJson(def, flat), sortOrder: i + 1 } as Record<string, unknown>;
+      const values = { ...splitJson(def, flat), sortOrder: ++position } as Record<string, unknown>;
       if (reg.key === "schema" && flat.projectId) values.projectId = flat.projectId;
-      for (const f of def.fields) if (f.required && (values[f.key] === null || values[f.key] === undefined) && !f.json) values[f.key] = f.type === "select" ? "Not Started" : "-";
+      // A required column the file leaves empty is filled with the workbook's own placeholder,
+      // and the team is told which row and column, so nothing is corrected silently.
+      for (const f of def.fields) {
+        if (f.json || f.derived || !f.required) continue;
+        if (values[f.key] !== null && values[f.key] !== undefined && values[f.key] !== "") continue;
+        values[f.key] = f.type === "select" ? "Not Started" : "-";
+        addWarning(
+          summary.warnings,
+          `${reg.sheet} row ${flat.__row}: ${f.label} is empty; imported as "${values[f.key]}".`,
+        );
+      }
       const k = keyOf(def, { ...flat, ...values });
       const e = byKey.get(k);
       if (e) {
@@ -407,15 +652,15 @@ async function applyHub(tx: Tx, parsed: ParsedWorkbook, dryRun: boolean): Promis
         if (!dryRun) await tx.insert(table).values(values as never);
       }
     }
-    summary.registers.push({ key: reg.key, sheet: reg.sheet, found: reg.found, rows: reg.rows.length, inserted: ins, updated: upd });
+    summary.registers.push({ key: reg.key, sheet: reg.sheet, found: reg.found, rows: position, inserted: ins, updated: upd, skipped });
   }
 
   // Workflow steps and enterprise apps from the report sheets.
   for (const [name, steps] of parsed.workflows) {
     const id = projectIdByName.get(norm(name));
-    if (!id || id.startsWith("dry-")) continue;
+    if (!id) continue;
     summary.workflows++;
-    if (dryRun) continue;
+    if (dryRun || id.startsWith("dry-")) continue;
     await tx.delete(workflowStep).where(eq(workflowStep.projectId, id));
     await tx.insert(workflowStep).values(steps.map((s, i) => ({ projectId: id, stepNo: i + 1, name: s.name, status: s.status })));
   }
@@ -459,7 +704,9 @@ export async function importHubWorkbook(actor: Actor, file: { name: string; buff
   });
 }
 
+/** Sentinel that rolls the dry run back after its summary is written. Expected, never logged. */
 class DryRunRollback extends Error {
+  readonly expected = true;
   constructor(readonly summary: ImportSummary) {
     super("dry run");
   }
@@ -512,8 +759,7 @@ const clientInput = z.object({ clientName: z.string().trim().min(1, "Client name
 export async function importClientSchema(actor: Actor, raw: unknown, file: { name: string; buffer: ArrayBuffer | Buffer }, dryRun: boolean): Promise<ClientSchemaSummary> {
   assertCan(actor, "import:run");
   const input = parseInput(clientInput, raw);
-  const wb = new ExcelJS.Workbook();
-  await wb.xlsx.load(file.buffer as never);
+  const wb = await loadWorkbook(file.buffer);
   const warnings: string[] = [];
   const master = readTable(wb.getWorksheet("Master Tracker"), "Feature Class");
   const dict = readTable(wb.getWorksheet("Dictionary"), "Field Name");

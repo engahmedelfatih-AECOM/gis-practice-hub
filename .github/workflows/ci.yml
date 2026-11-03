@@ -57,11 +57,22 @@ jobs:
           SEED_ADMIN_EMAIL: admin@example.com
           SEED_ADMIN_NAME: CI Administrator
           SEED_ADMIN_PASSWORD: Ci-Only-Password-123!
+      # The role walk-throughs run on the sample workbook with one account per role.
+      - name: Load the sample workbook
+        run: npx tsx scripts/import-sample.ts
+        env:
+          DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5433/gh_e2e
+      - name: Create the role accounts
+        run: npx tsx scripts/demo-accounts.ts
+        env:
+          DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5433/gh_e2e
+          DEMO_ACCOUNTS_PASSWORD: Ci-Only-Demo-Password-123!
       - run: npm run test:e2e
         env:
           DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5433/gh_e2e
           E2E_ADMIN_EMAIL: admin@example.com
           E2E_ADMIN_PASSWORD: Ci-Only-Password-123!
+          E2E_DEMO_PASSWORD: Ci-Only-Demo-Password-123!
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
