@@ -1,4 +1,6 @@
-import { sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
+import { SEED_LISTS } from "@/domain/hub/seed-lists";
+import { LIST_KEY_VALUES } from "@/domain/shared/enums";
 import { db } from "@/infrastructure/db/client";
 import * as schema from "@/infrastructure/db/schema";
 import type { Actor } from "@/application/auth/actor";
@@ -59,6 +61,22 @@ export const manager = () => makeActor([{ role: "GIS_MANAGER" }]);
 export const lead = () => makeActor([{ role: "GIS_LEAD" }]);
 export const specialist = () => makeActor([{ role: "GIS_SPECIALIST" }]);
 export const viewer = () => makeActor([{ role: "VIEWER" }]);
+
+/**
+ * Load the dropdown lists of the workbook, as `scripts/seed.ts` does. A strict field is only
+ * valid against the Lists sheet, so a test that creates rows through the services needs them.
+ */
+export async function seedLists(): Promise<void> {
+  for (const key of LIST_KEY_VALUES) {
+    const items = SEED_LISTS[key];
+    if (!items.length) continue;
+    const existing = await db.select({ id: schema.listItem.id }).from(schema.listItem).where(eq(schema.listItem.listKey, key)).limit(1);
+    if (existing.length) continue;
+    await db
+      .insert(schema.listItem)
+      .values(items.map((it, i) => ({ listKey: key, value: it.value, group: it.group ?? null, sortOrder: i + 1 })));
+  }
+}
 
 /** A region list value (for region-scoped grants). */
 export async function seedRegion(value = "India") {

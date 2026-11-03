@@ -116,6 +116,13 @@ export async function listRows(actor: Actor, key: RegisterKey, filter: RegisterF
           : isNull(cols.projectId!),
       );
     }
+  } else if (key === "projects") {
+    // The Projects register has no projectId column: each row is a project, so the scope is
+    // applied to its own id (report 2026-11-02, B2).
+    const scope = await scopeOf(actor, "hub:read");
+    if (!scope.all) {
+      conds.push(scope.projectIds.length ? inArray(cols.id!, scope.projectIds) : sql`false`);
+    }
   }
   if (filter.status && cols.status) conds.push(eq(cols.status, filter.status));
   if (filter.q?.trim()) {
@@ -159,7 +166,10 @@ export async function getRow(actor: Actor, key: RegisterKey, id: string): Promis
   if (!row) throw notFound(def.label);
   const flat = flattenRow(def, row as Record<string, unknown>) as RegisterRow;
   const scope = await scopeOf(actor, "hub:read");
-  if (!inScope(scope, flat.projectId as string | null)) {
+  // A row of the Projects register is the project itself: it has no projectId column, so the
+  // scope is checked against its own id (otherwise it would look practice-wide).
+  const scopeProjectId = key === "projects" ? (flat.id as string) : (flat.projectId as string | null);
+  if (!inScope(scope, scopeProjectId)) {
     throw forbidden(`see this row of ${def.label} (your access covers ${scope.regionValues.join(", ") || "no region"})`);
   }
   if (flat.projectId) {
@@ -258,7 +268,10 @@ export async function updateRow(actor: Actor, key: RegisterKey, raw: unknown): P
   const table = TABLES[key];
   const [target] = await db.select().from(table).where(eq(table.id, head.id)).limit(1);
   if (!target) throw notFound(def.label);
-  const level = await assertManage(actor, def, (target as RegisterRow).projectId ?? (flat.projectId as string | null));
+  // On the Projects register the row is the project, so the region of a write is its own id.
+  const writeProjectId =
+    key === "projects" ? (target as RegisterRow).id : ((target as RegisterRow).projectId ?? (flat.projectId as string | null));
+  const level = await assertManage(actor, def, writeProjectId);
   await validateStrict(def, flat);
   await withTx(async (tx) => {
     const [existing] = await tx.select().from(table).where(eq(table.id, head.id)).limit(1);
@@ -289,7 +302,8 @@ export async function deleteRow(actor: Actor, key: RegisterKey, rawId: unknown):
   const table = TABLES[key];
   const [target] = await db.select().from(table).where(eq(table.id, id)).limit(1);
   if (!target) throw notFound(def.label);
-  if ((await assertManage(actor, def, (target as RegisterRow).projectId)) === "progress") throw forbidden(`delete rows of ${def.label}`);
+  const delProjectId = key === "projects" ? (target as RegisterRow).id : (target as RegisterRow).projectId;
+  if ((await assertManage(actor, def, delProjectId)) === "progress") throw forbidden(`delete rows of ${def.label}`);
   await withTx(async (tx) => {
     const [existing] = await tx.select().from(table).where(eq(table.id, id)).limit(1);
     if (!existing) throw notFound(def.label);
