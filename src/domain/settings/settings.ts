@@ -26,6 +26,11 @@ export const SETTINGS = {
     schema: z.coerce.number().int().min(7).max(31),
     default: 14,
   },
+  "report.currentPeriodStart": {
+    label: "Current report period, by its start date (empty = the period of today)",
+    schema: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).or(z.literal("")),
+    default: "",
+  },
   "map.styleUrl": {
     label: "Map style URL (MapLibre style JSON; empty = built-in OpenStreetMap raster style)",
     schema: z.string().url().or(z.literal("")),

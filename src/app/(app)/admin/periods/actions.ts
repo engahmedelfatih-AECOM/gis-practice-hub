@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireActor } from "@/application/auth/actor";
-import { createPeriod, deletePeriod, regeneratePeriods, updatePeriod } from "@/application/hub/periods";
+import { createPeriod, deletePeriod, regeneratePeriods, setCurrentPeriod, updatePeriod } from "@/application/hub/periods";
 import { formToObject } from "@/application/shared/guard";
 import type { ActionState } from "@/components/ui/action-state";
 import { act } from "@/app/_lib/actions";
@@ -38,5 +38,12 @@ export async function deletePeriodAction(_p: ActionState, fd: FormData): Promise
   return act(async () => {
     await deletePeriod(await requireActor(), fd.get("id"));
     return done("Period deleted.");
+  });
+}
+
+export async function setCurrentPeriodAction(_p: ActionState, fd: FormData): Promise<ActionState> {
+  return act(async () => {
+    const period = await setCurrentPeriod(await requireActor(), fd.get("id") ?? "");
+    return done(period ? `Current report period: ${period.label}.` : "The Hub follows today's date again.");
   });
 }

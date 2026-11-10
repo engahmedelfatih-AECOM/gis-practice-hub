@@ -9,7 +9,7 @@ export interface PeriodOption {
   label: string;
 }
 
-export function PeriodSelect({ periods, selected, basePath, extra }: { periods: PeriodOption[]; selected: string; basePath: string; extra?: Record<string, string> }) {
+export function PeriodSelect({ periods, selected, basePath, extra, current }: { periods: PeriodOption[]; selected: string; basePath: string; extra?: Record<string, string>; /** Id of the period the GIS Manager set as current, marked in the list. */ current?: string | null }) {
   const router = useRouter();
   return (
     <label className="flex items-center gap-2 text-sm">
@@ -26,6 +26,7 @@ export function PeriodSelect({ periods, selected, basePath, extra }: { periods: 
         {periods.map((p) => (
           <option key={p.id} value={p.id}>
             {p.label}
+            {current && p.id === current ? " - current" : ""}
           </option>
         ))}
       </Select>

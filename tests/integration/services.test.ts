@@ -12,7 +12,7 @@ import {
 } from "@/application/hub/registers";
 import { REGISTERS } from "@/domain/hub/registers";
 import { addListValue, deleteListValue, listAll, listValues, updateListValue } from "@/application/hub/lists";
-import { createPeriod, deletePeriod, listPeriods, regeneratePeriods, resolvePeriod, updatePeriod } from "@/application/hub/periods";
+import { createPeriod, deletePeriod, listPeriods, currentPeriodSetting, regeneratePeriods, resolvePeriod, setCurrentPeriod, updatePeriod } from "@/application/hub/periods";
 import { getSetting, listSettings, updateSetting } from "@/application/settings/settings";
 import { admin, db, lead, manager, resetDb, schema, seedLists, specialist, viewer } from "./helpers";
 
@@ -215,6 +215,38 @@ describe("periods service", () => {
 
     const l = await lead();
     await expect(createPeriod(l, { startDate: "2026-11-09", endDate: "" })).rejects.toThrow();
+  });
+
+  it("lets the manager set the current report period for everyone (proposal 11)", async () => {
+    const m = await manager();
+    await regeneratePeriods(m, { startDate: "2026-01-05", count: 4 });
+    const periods = await listPeriods();
+    expect(await currentPeriodSetting()).toBeNull();
+
+    // Set: everyone opens on it, and an explicit choice of another period still wins.
+    await setCurrentPeriod(m, periods[1]!.id);
+    expect((await currentPeriodSetting())!.id).toBe(periods[1]!.id);
+    expect((await resolvePeriod(null))!.id).toBe(periods[1]!.id);
+    expect((await resolvePeriod(periods[3]!.id))!.id).toBe(periods[3]!.id);
+
+    // It is stored by start date, so a regeneration with the same dates keeps it.
+    await regeneratePeriods(m, { startDate: "2026-01-05", count: 4 });
+    expect((await currentPeriodSetting())!.startDate).toBe(periods[1]!.startDate);
+
+    // A period that left the calendar no longer counts: back to the period of today.
+    await regeneratePeriods(m, { startDate: "2027-03-01", count: 2 });
+    expect(await currentPeriodSetting()).toBeNull();
+    expect((await resolvePeriod(null))!.id).toBeTruthy();
+
+    // Cleared: the Hub follows today's date again.
+    const again = await listPeriods();
+    await setCurrentPeriod(m, again[0]!.id);
+    await setCurrentPeriod(m, "");
+    expect(await currentPeriodSetting()).toBeNull();
+
+    // Only the manager owns it.
+    await expect(setCurrentPeriod(await lead(), again[0]!.id)).rejects.toThrow();
+    await expect(setCurrentPeriod(m, crypto.randomUUID())).rejects.toThrow(/Report period/);
   });
 });
 

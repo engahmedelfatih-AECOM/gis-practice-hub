@@ -4,6 +4,7 @@ import { dashboard } from "@/application/hub/views";
 import { getOverview } from "@/application/system/overview";
 import { stageCode } from "@/domain/hub/rules";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
+import { currentPeriodSetting } from "@/application/hub/periods";
 import { PeriodSelect } from "@/components/hub/period-select";
 import { ProjectsMap } from "@/components/hub/projects-map";
 import { toneClass } from "@/components/hub/tones";
@@ -17,7 +18,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Se
   const sp = await searchParams;
   return guarded(async () => {
     const actor = await requireActor();
-    const [d, overview] = await Promise.all([dashboard(actor, param(sp, "period")), getOverview(actor)]);
+    const [d, overview, current] = await Promise.all([dashboard(actor, param(sp, "period")), getOverview(actor), currentPeriodSetting()]);
     const k = d.kpis;
     const pending = overview.setup.filter((s) => !s.done);
     return (
@@ -43,11 +44,16 @@ export default async function DashboardPage({ searchParams }: { searchParams: Se
           </Card>
         ) : null}
         <div className="flex flex-wrap items-center gap-4 text-sm">
-          <PeriodSelect periods={d.periods} selected={d.period?.id ?? ""} basePath="/" />
+          <PeriodSelect periods={d.periods} selected={d.period?.id ?? ""} basePath="/" current={current?.id} />
           {d.period ? (
             <span className="text-gray-600">
               Period: {formatDate(d.period.startDate)} to {formatDate(d.period.endDate)} - Generated: {formatDate(d.today)}
             </span>
+          ) : null}
+          {current && d.period && current.id !== d.period.id ? (
+            <Link href="/" className="text-brand-link hover:underline">
+              Back to the current report period ({current.label})
+            </Link>
           ) : null}
         </div>
         <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
