@@ -384,10 +384,15 @@ export async function registerExtras(key: "packages" | "rfis" | "qaqc" | "resour
     };
   }
   const periods = await listPeriods();
-  return (row: Record<string, unknown>) => ({
-    "Report Period": periodLabel(row.periodFrom as string, row.periodTo as string | null),
-    "Standard period": periodBucket(row.periodFrom as string, periods)?.label ?? "outside the calendar",
-  });
+  // The page reads the column labels from the first row, so an empty register calls this with {}.
+  return (row: Record<string, unknown>) => {
+    const from = row.periodFrom as string | undefined;
+    if (!from) return { "Report Period": "", "Standard period": "" };
+    return {
+      "Report Period": periodLabel(from, row.periodTo as string | null),
+      "Standard period": periodBucket(from, periods)?.label ?? "outside the calendar",
+    };
+  };
 }
 
 export { periodLabel };
