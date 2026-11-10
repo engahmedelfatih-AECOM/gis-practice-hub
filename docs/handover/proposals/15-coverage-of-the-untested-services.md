@@ -4,6 +4,10 @@
 
 Current screen: Master Trackers (client schemas), one of the services without tests.
 
+Status: Hub part built on 2026-11-10 (branch `test/coverage-untested-services`). Line coverage of the
+domain and application code went from 80 % to 89 %; project extras, client schemas, API keys and the
+overview are at 100 %. The Planner part follows in the planner repository.
+
 ## Today
 
 - Tested today: import, registers, lists, periods, settings, scope, parity. Not tested: project extras, client schemas, feed, API keys, audit read; in the planner the GIS import, bids import, calendars, staff roles, clients and job token.
