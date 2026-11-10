@@ -6,6 +6,7 @@ import { Alert } from "@/components/ui/alert";
 import { ButtonLink } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import { PeriodSelect } from "@/components/hub/period-select";
+import { RowKeys, RowKeysHint } from "@/components/hub/row-keys";
 import { toneClass } from "@/components/hub/tones";
 import { cn } from "@/lib/cn";
 import { formatDate } from "@/lib/format";
@@ -44,8 +45,8 @@ export function ProjectsRegister({
         }
       />
       {saved ? <Alert tone="ok" className="mb-4">Project saved.</Alert> : null}
-      <div className="border-border bg-surface w-full overflow-x-auto rounded-lg border">
-        <table className="w-full text-left text-xs">
+      <RowKeys className="sheet-scroll border-border bg-surface w-full rounded-lg border">
+        <table className="sheet-table w-full text-left text-xs">
           <thead className="text-white">
             <tr>
               {th("#")}
@@ -81,7 +82,7 @@ export function ProjectsRegister({
           </thead>
           <tbody className="divide-border divide-y">
             {view.rows.map((p, i) => (
-              <tr key={p.id} className="hover:bg-stone-gray-25 align-top">
+              <tr key={p.id} data-row data-href={`/projects/${p.id}`} tabIndex={i === 0 ? 0 : -1} aria-label={`Row ${i + 1}, ${p.name}`} className="hover:bg-stone-gray-25 align-top">
                 <td className="px-2 py-1.5 text-gray-500">{i + 1}</td>
                 <td className="px-2 py-1.5 font-medium whitespace-nowrap">
                   <Link href={`/projects/${p.id}/edit`} className="text-brand-link hover:underline">
@@ -136,7 +137,8 @@ export function ProjectsRegister({
             ) : null}
           </tbody>
         </table>
-      </div>
+      </RowKeys>
+      {view.rows.length > 1 ? <RowKeysHint /> : null}
     </>
   );
 }

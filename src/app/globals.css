@@ -226,3 +226,53 @@ body {
 .tabular {
   font-variant-numeric: tabular-nums;
 }
+
+/* Register tables (the sheets): the header row and the first two columns stay in view while the
+   table scrolls, so a long or wide register can be read without losing the row or the column. */
+@layer components {
+  .sheet-scroll {
+    max-height: max(20rem, calc(100vh - 13rem));
+    overflow: auto;
+  }
+  .sheet-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background-color: var(--earth-green);
+  }
+  /* The focused row is marked on its cells, so the mark also shows on the columns that stay in view. */
+  .sheet-table tr[data-row]:focus-visible {
+    outline: none;
+  }
+  .sheet-table tr[data-row]:focus-visible td {
+    box-shadow:
+      inset 0 2px 0 var(--ring),
+      inset 0 -2px 0 var(--ring);
+  }
+  @media (min-width: 768px) {
+    .sheet-table thead th:nth-child(1),
+    .sheet-table tr[data-row] td:nth-child(1) {
+      position: sticky;
+      left: 0;
+      width: 2.5rem;
+      min-width: 2.5rem;
+    }
+    .sheet-table thead th:nth-child(2),
+    .sheet-table tr[data-row] td:nth-child(2) {
+      position: sticky;
+      left: 2.5rem;
+      box-shadow: 1px 0 0 var(--border);
+    }
+    .sheet-table thead th:nth-child(-n + 2) {
+      z-index: 3;
+    }
+    .sheet-table tr[data-row] td:nth-child(-n + 2) {
+      z-index: 1;
+      background-color: var(--surface);
+    }
+    .sheet-table tr[data-row]:hover td:nth-child(-n + 2),
+    .sheet-table tr[data-row]:focus-visible td:nth-child(-n + 2) {
+      background-color: var(--stone-gray-25);
+    }
+  }
+}

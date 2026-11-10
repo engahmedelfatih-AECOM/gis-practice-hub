@@ -4,6 +4,12 @@
 
 Current screen: Packages register with the status chips.
 
+Status: built on 2026-11-10 (branch `feat/accessibility-contrast`). The screenshot shows the screen before the change.
+
+Measured result: the yellow and light green chips already pass WCAG AA (dark text, 12:1 and 14:1). The one
+failing pair was white text on the coral fill ("Client Comments", "Red", "Fail"), 3.2:1. It now uses dark text
+on the same fill (5.8:1).
+
 ## Today
 
 - Some status chips (yellow "In Progress", light green "Submitted") have low text contrast.

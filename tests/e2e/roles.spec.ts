@@ -81,6 +81,24 @@ test.describe("Role walk-through on the sample workbook", () => {
     await expect(page.getByLabel("Progress %")).toBeDisabled();
   });
 
+  test("a register is walked with the keyboard and keeps its header in view", async ({ page }) => {
+    test.setTimeout(120_000);
+    await signIn(page, ACCOUNTS.viewer);
+    await page.goto("/packages");
+    const rows = page.locator("tr[data-row]");
+    await rows.first().focus();
+    await page.keyboard.press("ArrowDown");
+    await expect(rows.nth(1)).toBeFocused();
+    await page.keyboard.press("End");
+    await expect(rows.last()).toBeFocused();
+    await page.keyboard.press("Home");
+    await expect(rows.first()).toBeFocused();
+    // The header row sticks to the top of the table while it scrolls.
+    await expect(page.locator(".sheet-table thead th").first()).toHaveCSS("position", "sticky");
+    await page.keyboard.press("Enter");
+    await expect(page).toHaveURL(/\/packages\/[0-9a-f-]+$/);
+  });
+
   test("the GIS Specialist saves the progress fields and cannot plan the package", async ({ page }) => {
     test.setTimeout(120_000);
     await signIn(page, ACCOUNTS.specialist);
