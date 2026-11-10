@@ -4,6 +4,8 @@
 
 Current screen: Dashboard with the Report period selector.
 
+Status: built on 2026-11-10 (branch `feat/dashboard-period-setting`). The screenshot shows the screen before the change.
+
 ## Today
 
 - Each user picks the report period for themselves; the default is the period of today.

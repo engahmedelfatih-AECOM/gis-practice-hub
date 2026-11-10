@@ -5,7 +5,7 @@ import { z } from "zod";
 import { addDays, periodBucket, periodLabel, todayIso } from "@/domain/hub/rules";
 import { isoDateSchema, uuidSchema } from "@/domain/shared/schema";
 import { db } from "@/infrastructure/db/client";
-import { reportPeriod } from "@/infrastructure/db/schema";
+import { appSetting, reportPeriod } from "@/infrastructure/db/schema";
 import type { Actor } from "@/application/auth/actor";
 import { writeAudit } from "@/application/audit/audit";
 import { notFound, validation } from "@/application/errors";
@@ -26,13 +26,65 @@ export const listPeriods = cache(async (): Promise<PeriodView[]> => {
   return rows.map((r) => ({ id: r.id, startDate: r.startDate, endDate: r.endDate, label: periodLabel(r.startDate, r.endDate) }));
 });
 
-/** The period to show by default: the one containing today, else the last one before today, else the first. */
-export async function defaultPeriod(periods: PeriodView[], today = todayIso()): Promise<PeriodView | null> {
+/**
+ * The period to show by default. The GIS Manager can set one period as the current report period
+ * for everyone (the cream cell of the workbook Dashboard); without it, or when that period is no
+ * longer in the calendar, it is the one containing today, else the last one before today, else the first.
+ */
+export async function defaultPeriod(periods: PeriodView[], today = todayIso(), currentStart = ""): Promise<PeriodView | null> {
   if (!periods.length) return null;
+  const set = currentStart ? periods.find((p) => p.startDate === currentStart) : undefined;
+  if (set) return set;
   const current = periodBucket(today, periods);
   if (current) return current;
   const before = periods.filter((p) => p.endDate < today);
   return before.length ? before[before.length - 1]! : periods[0]!;
+}
+
+/** The period the GIS Manager set as current, or null when the Hub follows today's date. */
+export async function currentPeriodSetting(): Promise<PeriodView | null> {
+  const start = await readCurrentStart();
+  if (!start) return null;
+  return (await listPeriods()).find((p) => p.startDate === start) ?? null;
+}
+
+/** Read without the per-request cache: the value changes inside one request when the manager sets it. */
+async function readCurrentStart(): Promise<string> {
+  const [row] = await db.select().from(appSetting).where(eq(appSetting.key, CURRENT_KEY)).limit(1);
+  return typeof row?.value === "string" ? row.value : "";
+}
+
+const CURRENT_KEY = "report.currentPeriodStart";
+
+/**
+ * Set the current report period for everyone, or clear it (empty id) so the Hub follows today's date.
+ * Stored by start date, so it survives a regeneration of the calendar that keeps the same dates.
+ */
+export async function setCurrentPeriod(actor: Actor, rawId: unknown): Promise<PeriodView | null> {
+  assertCan(actor, "period:manage");
+  const id = parseInput(uuidSchema.or(z.literal("")), rawId ?? "");
+  return withTx(async (tx) => {
+    let period: PeriodView | null = null;
+    if (id) {
+      const [row] = await tx.select().from(reportPeriod).where(eq(reportPeriod.id, id));
+      if (!row) throw notFound("Report period");
+      period = { id: row.id, startDate: row.startDate, endDate: row.endDate, label: periodLabel(row.startDate, row.endDate) };
+    }
+    const value = period?.startDate ?? "";
+    const [before] = await tx.select().from(appSetting).where(eq(appSetting.key, CURRENT_KEY)).limit(1);
+    await tx
+      .insert(appSetting)
+      .values({ key: CURRENT_KEY, value, updatedBy: actor.userId, updatedAt: new Date() })
+      .onConflictDoUpdate({ target: appSetting.key, set: { value, updatedBy: actor.userId, updatedAt: new Date() } });
+    await writeAudit(tx, actor, {
+      action: "period.setCurrent",
+      entityType: "report_period",
+      entityId: period?.id,
+      before: { key: CURRENT_KEY, value: before?.value ?? null },
+      after: { key: CURRENT_KEY, value },
+    });
+    return period;
+  });
 }
 
 export async function resolvePeriod(id: string | null | undefined): Promise<PeriodView | null> {
@@ -41,7 +93,7 @@ export async function resolvePeriod(id: string | null | undefined): Promise<Peri
     const found = periods.find((p) => p.id === id);
     if (found) return found;
   }
-  return defaultPeriod(periods);
+  return defaultPeriod(periods, todayIso(), await readCurrentStart());
 }
 
 const periodInput = z.object({ startDate: isoDateSchema, endDate: isoDateSchema.optional().or(z.literal("")) });

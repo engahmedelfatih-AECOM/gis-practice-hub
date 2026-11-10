@@ -7,6 +7,7 @@ import { UPDATE_TYPES, UPDATE_TYPE_BLOCKS } from "@/domain/shared/enums";
 import { stageCode } from "@/domain/hub/rules";
 import { Alert } from "@/components/ui/alert";
 import { ButtonLink } from "@/components/ui/button";
+import { currentPeriodSetting } from "@/application/hub/periods";
 import { PeriodSelect } from "@/components/hub/period-select";
 import { toneClass } from "@/components/hub/tones";
 import { cn } from "@/lib/cn";
@@ -28,7 +29,7 @@ export default async function ProjectReportPage({ params, searchParams }: { para
   const sp = await searchParams;
   return guarded(async () => {
     const actor = await requireActor();
-    const page = await projectPage(actor, id, param(sp, "period"));
+    const [page, current] = await Promise.all([projectPage(actor, id, param(sp, "period")), currentPeriodSetting()]);
     const p = page.project;
     const canWorkflow = can(actor, "workflow:manage");
     const periodQuery = page.period ? `?period=${page.period.id}` : "";
@@ -44,7 +45,7 @@ export default async function ProjectReportPage({ params, searchParams }: { para
             </h1>
             <p className="mt-1 text-sm text-gray-600">GIS Practice | Bi-weekly report | {page.period?.label ?? "no period selected"}</p>
             <div className="mt-3 flex flex-wrap items-center gap-2">
-              <PeriodSelect periods={page.periods} selected={page.period?.id ?? ""} basePath={`/projects/${p.id}`} />
+              <PeriodSelect periods={page.periods} selected={page.period?.id ?? ""} basePath={`/projects/${p.id}`} current={current?.id} />
               <ButtonLink href={`/delivery-tracker?project=${p.id}`} variant="secondary" size="sm">
                 Delivery Tracker
               </ButtonLink>
