@@ -9,7 +9,8 @@ export const TONE_CLASS: Record<Tone, string> = {
   green: "bg-earth-green text-white",
   lime: "bg-lime-green-50 text-gray-900",
   amber: "bg-sunrise-yellow text-gray-900",
-  coral: "bg-coral-orange-75 text-white",
+  // Dark text: white on this fill is 3.2:1, below WCAG AA. The fill is the workbook colour and stays.
+  coral: "bg-coral-orange-75 text-gray-900",
   dark: "bg-midnight-teal text-white",
   grey: "bg-black-25 text-gray-700",
   teal: "bg-ocean-teal-25 text-gray-900",

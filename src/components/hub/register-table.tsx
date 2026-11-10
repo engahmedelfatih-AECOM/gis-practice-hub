@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { FieldDef } from "@/domain/hub/registers";
 import { cn } from "@/lib/cn";
 import { formatDate } from "@/lib/format";
+import { RowKeys, RowKeysHint } from "./row-keys";
 import { toneClass } from "./tones";
 
 export interface ExtraColumn {
@@ -20,7 +21,8 @@ function cellText(f: FieldDef, row: Record<string, unknown>): string {
 
 /**
  * The sheet as a table: one column per field in sheet order (plus the calculated extras),
- * the workbook colours on status cells, and an edit link per row.
+ * the workbook colours on status cells, and an edit link per row. The header and the first
+ * two columns stay in view while the table scrolls, and the rows can be walked with the keyboard.
  */
 export function RegisterTable({
   fields,
@@ -41,8 +43,9 @@ export function RegisterTable({
   // Calculated columns are shown once, as extras, not as an empty stored column.
   const columns = fields.filter((f) => !f.derived);
   return (
-    <div className="border-border bg-surface w-full overflow-x-auto rounded-lg border">
-      <table className="w-full text-left text-xs">
+    <>
+    <RowKeys className="sheet-scroll border-border bg-surface w-full rounded-lg border">
+      <table className="sheet-table w-full text-left text-xs">
         <thead className="bg-earth-green text-white">
           <tr>
             <th className="px-2 py-2 font-semibold whitespace-nowrap">#</th>
@@ -61,7 +64,7 @@ export function RegisterTable({
         </thead>
         <tbody className="divide-border divide-y">
           {rows.map((row, i) => (
-            <tr key={String(row.id)} className="hover:bg-stone-gray-25 align-top">
+            <tr key={String(row.id)} data-row data-href={editHref(row)} tabIndex={i === 0 ? 0 : -1} aria-label={`Row ${startNumber + i}${rowLabel?.(row) ? `, ${rowLabel(row)}` : ""}`} className="hover:bg-stone-gray-25 align-top">
               <td className="px-2 py-1.5 text-gray-500">{startNumber + i}</td>
               {columns.map((f) => {
                 const text = cellText(f, row);
@@ -105,6 +108,8 @@ export function RegisterTable({
           ) : null}
         </tbody>
       </table>
-    </div>
+    </RowKeys>
+    {rows.length > 1 ? <RowKeysHint /> : null}
+    </>
   );
 }
