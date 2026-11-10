@@ -58,6 +58,12 @@ jobs:
           SEED_ADMIN_NAME: CI Administrator
           SEED_ADMIN_PASSWORD: Ci-Only-Password-123!
       # The role walk-throughs run on the sample workbook with one account per role.
+      - name: Open every page on the empty database
+        run: npx playwright test tests/e2e/pages.spec.ts
+        env:
+          DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5433/gh_e2e
+          E2E_ADMIN_EMAIL: admin@example.com
+          E2E_ADMIN_PASSWORD: Ci-Only-Password-123!
       - name: Load the sample workbook
         run: npx tsx scripts/import-sample.ts
         env:
