@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { TONE_CLASS } from "@/components/hub/tones";
+import { SIDEBAR_PANEL_ALPHA, SIDEBAR_TONES } from "@/components/layout/sidebar-tones";
 
 /**
  * Contrast gate (proposal 12): every text and fill pair used for a status chip or a badge must
@@ -61,5 +62,47 @@ describe("contrast of the status colours (WCAG AA, proposal 12)", () => {
       expect(contrast(resolve(surface), resolve("--color-gray-500"))).toBeGreaterThanOrEqual(AA);
       expect(contrast(resolve(surface), resolve("--color-gray-600"))).toBeGreaterThanOrEqual(AA);
     }
+  });
+});
+
+/** Colour seen when `top` is laid over `bottom` at opacity `alpha` (0 to 1). */
+function blend(top: string, bottom: string, alpha: number): string {
+  const ch = (hex: string, i: number) => parseInt(hex.replace("#", "").slice(i, i + 2), 16);
+  return (
+    "#" +
+    [0, 2, 4]
+      .map((i) => Math.round(alpha * ch(top, i) + (1 - alpha) * ch(bottom, i)).toString(16).padStart(2, "0"))
+      .join("")
+  );
+}
+
+/** "bg-midnight-teal/85" to the token's hex value and 0.85. */
+function fill(classes: string): { hex: string; alpha: number } {
+  const m = /(?:^|\s|:)bg-([\w-]+?)(?:\/(\d+))?(?:\s|$)/.exec(classes);
+  if (!m) throw new Error(`No fill in "${classes}"`);
+  return { hex: resolve(`--color-${m[1]}`), alpha: m[2] ? Number(m[2]) / 100 : 1 };
+}
+
+describe("contrast of the glass navigation panel (WCAG AA)", () => {
+  const panelFill = fill(SIDEBAR_TONES.panel);
+  // The panel floats over the page surface; the glass is blended over it before measuring.
+  const panel = blend(panelFill.hex, resolve("--color-surface-muted"), SIDEBAR_PANEL_ALPHA);
+  const white = resolve("--color-white");
+
+  it("the panel opacity in the class and in the constant agree", () => {
+    expect(panelFill.alpha).toBe(SIDEBAR_PANEL_ALPHA);
+  });
+
+  it("white text on the panel, on a hovered row and on the active page pill", () => {
+    expect(contrast(panel, white)).toBeGreaterThanOrEqual(AA);
+    for (const tone of [SIDEBAR_TONES.hover, SIDEBAR_TONES.active]) {
+      const f = fill(tone);
+      expect(contrast(blend(f.hex, panel, f.alpha), white)).toBeGreaterThanOrEqual(AA);
+    }
+  });
+
+  it("role names on the panel", () => {
+    const text = resolve(`--color-${SIDEBAR_TONES.role.replace(/^text-/, "")}`);
+    expect(contrast(panel, text)).toBeGreaterThanOrEqual(AA);
   });
 });

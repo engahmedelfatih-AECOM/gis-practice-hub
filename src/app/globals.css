@@ -222,6 +222,11 @@ body {
   outline-offset: 2px;
 }
 
+/* On the green navigation panel the focus ring is white, so it stays visible. */
+[data-nav-panel] :focus-visible {
+  outline-color: var(--white);
+}
+
 /* Tabular figures for numbers in tables. */
 .tabular {
   font-variant-numeric: tabular-nums;

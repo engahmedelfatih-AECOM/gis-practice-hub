@@ -468,6 +468,8 @@ dropdown behaviour, formulas) follows the workbook.
 | 2026-11-03 | The API key travels in the `x-api-key` header only; a key in the query string is refused with 400 | A key in a URL ends up in access logs and proxy caches (report m14) |
 | 2026-11-10 | Hub PR #1 merged into main by the owner's go; RACI change A9 approved: the GIS Specialist no longer edits the QA/QC register, the GIS Lead no longer edits the client schema (both still read them) | GIS-STD-001 3.5: the QA/QC result is the Lead's R/A; the client schema dictionary is the Specialist's R with the Manager accountable |
 | 2026-11-10 | "Go all" by the owner: Hub PR #3, planner PR #9 and PR #8 merged; the drop of the 13 old hub tables of the planner database accepted | Sample data only; the Hub keeps its own database |
+| 2026-11-10 | The Resource Planner's Project Number is the master; the Hub's Project Number (proposal 02, Hub PR #7) follows it and is the key of the future Planner to Hub link | Owner's confirmation; the planner owns the project record |
+| 2026-11-10 | Hub navigation upgraded (branch `feat/sidebar-dock`): floating glass panel, collapsible to a 60px icon rail (choice kept in the browser's localStorage), dock-style magnification with transforms only, off for touch and reduced motion; navigation UI only, no new dependency (Radix Tooltip is part of the existing `radix-ui` package) | Owner's request; the Planner gets the same change after the owner has seen the Hub |
 
 ---
 
