@@ -1,0 +1,113 @@
+{
+  "source": "GIS_Practice_Hub_sample.xlsx",
+  "note": "Cached Excel values of the sample workbook. Only cells the file carries a calculated value for are listed. Values that depend on TODAY() were calculated by Excel on 30-Oct-2026.",
+  "dashboard": {
+    "totalProjects": 10,
+    "activeProjects": 9,
+    "teamUtilisation": 0.6,
+    "openRisks": 6,
+    "periodStart": "2026-10-26",
+    "periodEnd": "2026-11-08"
+  },
+  "rows": [
+    {
+      "sheet": "Projects",
+      "key": "Laheq Island",
+      "values": {
+        "GIS Delivered / Approved": "MP Masterplan - Plots & Parcels (2D) - Approved",
+        "GIS In Progress": "IFC Power / Electrical (MV/LV) (2D & 3D); IFC Security (2D & 3D); IFC Telecom / ICT (2D & 3D); IFC Irrigation / TSE (2D & 3D); IFC Sewer / Wastewater (2D & 3D)",
+        "Next Milestone": "IFC Power / Electrical (MV/LV) (2D & 3D) - 29-Oct-26",
+        "GIS Resources Region": "Mix EC Resources"
+      }
+    },
+    {
+      "sheet": "Projects",
+      "key": "QIC Delta B (D10)",
+      "values": {
+        "GIS Delivered / Approved": "SD Roads & Highways (2D) - Approved",
+        "GIS In Progress": "DD Roads & Highways (2D)",
+        "Next Milestone": "DD Roads & Highways (2D) - 05-Nov-26",
+        "GIS Resources Region": "India"
+      }
+    },
+    {
+      "sheet": "Projects",
+      "key": "D11 Urban Core",
+      "values": {
+        "GIS Delivered / Approved": "CD Roads & Highways (2D) - Resubmitted",
+        "Next Milestone": "-",
+        "Utilisation %": 0.7,
+        "GIS Resources Region": "Romania"
+      }
+    },
+    {
+      "sheet": "Projects",
+      "key": "QIC D14 & D17",
+      "values": {
+        "Next Milestone": "-",
+        "GIS Resources Region": "-"
+      }
+    },
+    {
+      "sheet": "Projects",
+      "key": "Al Soudah - TO1",
+      "values": {
+        "GIS In Progress": "CD Potable Water (2D)",
+        "Next Milestone": "-",
+        "GIS Resources Region": "-"
+      }
+    },
+    {
+      "sheet": "Projects",
+      "key": "D24 - DEM Support",
+      "values": {
+        "GIS In Progress": "PC Roads & Highways (2D)",
+        "Next Milestone": "PC Roads & Highways (2D) - 10-Nov-26",
+        "GIS Resources Region": "-"
+      }
+    },
+    {
+      "sheet": "Projects",
+      "key": "ML04 / RTA 3D Scene Viewer",
+      "values": {
+        "Next Milestone": "-",
+        "GIS Resources Region": "Dubai"
+      }
+    },
+    {
+      "sheet": "Projects",
+      "key": "Masdar City",
+      "values": {
+        "Next Milestone": "-",
+        "GIS Resources Region": "-"
+      }
+    },
+    {
+      "sheet": "Projects",
+      "key": "QIC D9",
+      "values": {
+        "GIS In Progress": "CD All Infrastructure Disciplines (2D)",
+        "Next Milestone": "-",
+        "Utilisation %": 0.5,
+        "GIS Resources Region": "Dubai"
+      }
+    },
+    {
+      "sheet": "Projects",
+      "key": "Rana",
+      "values": {
+        "GIS In Progress": "CD Stormwater Drainage (3D)",
+        "Next Milestone": "-",
+        "GIS Resources Region": "-"
+      }
+    },
+    {
+      "sheet": "QAQC",
+      "key": "D24 - DEM Support",
+      "values": {
+        "Score": 0.625,
+        "Result": "Fail"
+      }
+    }
+  ]
+}

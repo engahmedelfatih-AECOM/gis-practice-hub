@@ -28,20 +28,25 @@ export function RegisterTable({
   extras = [],
   editHref,
   rowLabel,
+  startNumber = 1,
 }: {
   fields: FieldDef[];
   rows: Record<string, unknown>[];
   extras?: ExtraColumn[];
   editHref: (row: Record<string, unknown>) => string;
   rowLabel?: (row: Record<string, unknown>) => string;
+  /** Number of the first row on this page, so "#" keeps counting across pages. */
+  startNumber?: number;
 }) {
+  // Calculated columns are shown once, as extras, not as an empty stored column.
+  const columns = fields.filter((f) => !f.derived);
   return (
     <div className="border-border bg-surface w-full overflow-x-auto rounded-lg border">
       <table className="w-full text-left text-xs">
         <thead className="bg-earth-green text-white">
           <tr>
             <th className="px-2 py-2 font-semibold whitespace-nowrap">#</th>
-            {fields.map((f) => (
+            {columns.map((f) => (
               <th key={f.key} className="px-2 py-2 font-semibold whitespace-nowrap">
                 {f.label}
               </th>
@@ -57,8 +62,8 @@ export function RegisterTable({
         <tbody className="divide-border divide-y">
           {rows.map((row, i) => (
             <tr key={String(row.id)} className="hover:bg-stone-gray-25 align-top">
-              <td className="px-2 py-1.5 text-gray-500">{i + 1}</td>
-              {fields.map((f) => {
+              <td className="px-2 py-1.5 text-gray-500">{startNumber + i}</td>
+              {columns.map((f) => {
                 const text = cellText(f, row);
                 const tone = f.type === "select" ? toneClass(text) : "";
                 return (

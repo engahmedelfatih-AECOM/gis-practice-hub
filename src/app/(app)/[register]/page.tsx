@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { requireActor } from "@/application/auth/actor";
-import { listRows } from "@/application/hub/registers";
+import { PAGE_SIZE, countRows, listRows } from "@/application/hub/registers";
 import { listProjectsBrief } from "@/application/hub/project-extras";
 import { projectsView, registerExtras } from "@/application/hub/views";
 import { can } from "@/domain/authz/policy";
@@ -37,7 +37,22 @@ export default async function RegisterPage({ params, searchParams }: { params: P
       return <ProjectsRegister view={view} canAdd={canAdd} saved={Boolean(param(sp, "saved"))} exportHref={exportHref} />;
     }
 
-    const [rows, projects] = await Promise.all([listRows(actor, def.key, { projectId, q }), listProjectsBrief()]);
+    // One page at a time: the registers can hold thousands of rows after an import.
+    const page = Math.max(1, Number(param(sp, "page") ?? "1") || 1);
+    const [rows, total, projects] = await Promise.all([
+      listRows(actor, def.key, { projectId, q, limit: PAGE_SIZE, offset: (page - 1) * PAGE_SIZE }),
+      countRows(actor, def.key, { projectId, q }),
+      listProjectsBrief(),
+    ]);
+    const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+    const pageHref = (n: number) => {
+      const qs = new URLSearchParams();
+      if (projectId) qs.set("project", projectId);
+      if (q) qs.set("q", q);
+      if (n > 1) qs.set("page", String(n));
+      const s = qs.toString();
+      return s ? `${def.path}?${s}` : def.path;
+    };
     const extraFn = ["packages", "rfis", "qaqc", "resources", "updates"].includes(def.key)
       ? await registerExtras(def.key as "packages" | "rfis" | "qaqc" | "resources" | "updates")
       : null;
@@ -88,7 +103,9 @@ export default async function RegisterPage({ params, searchParams }: { params: P
           <Button type="submit" variant="secondary">
             Filter
           </Button>
-          <span className="pb-2 text-sm text-gray-500">{rows.length} rows</span>
+          <span className="pb-2 text-sm text-gray-500">
+            {total} rows{pages > 1 ? ` - page ${page} of ${pages}` : ""}
+          </span>
         </form>
         <RegisterTable
           fields={def.fields}
@@ -96,7 +113,25 @@ export default async function RegisterPage({ params, searchParams }: { params: P
           extras={extras}
           editHref={(row) => `${def.path}/${row.id}`}
           rowLabel={(row) => String(row[def.nameField] ?? "")}
+          startNumber={(page - 1) * PAGE_SIZE + 1}
         />
+        {pages > 1 ? (
+          <nav className="mt-4 flex items-center gap-2 text-sm" aria-label="Pages">
+            {page > 1 ? (
+              <ButtonLink href={pageHref(page - 1)} variant="secondary" size="sm">
+                Previous
+              </ButtonLink>
+            ) : null}
+            <span className="text-gray-600">
+              Rows {(page - 1) * PAGE_SIZE + 1} to {Math.min(page * PAGE_SIZE, total)} of {total}
+            </span>
+            {page < pages ? (
+              <ButtonLink href={pageHref(page + 1)} variant="secondary" size="sm">
+                Next
+              </ButtonLink>
+            ) : null}
+          </nav>
+        ) : null}
       </>
     );
   });

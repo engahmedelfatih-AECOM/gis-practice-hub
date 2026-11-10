@@ -18,17 +18,30 @@ describe("workbook import", () => {
     const dry = await importHubWorkbook(a, { name: "hub.xlsx", buffer: fixture() }, true);
     expect(dry.dryRun).toBe(true);
     expect(dry.registers.find((r) => r.key === "projects")!.rows).toBe(10);
+    expect(dry.registers.find((r) => r.key === "schema")!.rows).toBe(219);
+    // The dry run sees the projects of the file, so no sheet looks unmatched (report m4).
+    expect(dry.warnings.filter((w) => w.includes("is not on the Projects sheet"))).toEqual([]);
+    expect(dry.workflows).toBeGreaterThan(0);
     expect((await db.select().from(schema.project)).length).toBe(0);
 
     const first = await importHubWorkbook(a, { name: "hub.xlsx", buffer: fixture() }, false);
     const byKey = Object.fromEntries(first.registers.map((r) => [r.key, r]));
+    // Exactly the rows the sheets hold: a formula-only row is not a row (report 2026-11-02, B1 and M2).
     expect(byKey.projects!.inserted).toBe(10);
     expect(byKey.packages!.inserted).toBe(13);
-    expect(byKey.schema!.inserted).toBe(400);
+    expect(byKey.schema!.inserted).toBe(219);
     expect(byKey.resources!.inserted).toBe(11);
-    expect(byKey.updates!.inserted).toBe(12);
-    expect(byKey.risks!.inserted).toBe(7);
+    // 12 sheet rows, 1 of them without a description: a row with no key cell is not a row (decision 2026-11-03).
+    expect(byKey.updates!.inserted).toBe(11);
+    expect(byKey.updates!.skipped).toBe(1);
+    // Rows left out are reported once per sheet, not once per row (m5).
+    expect(first.warnings.filter((w) => w.includes("skipped because")).length).toBeLessThanOrEqual(3);
+    expect(byKey.risks!.inserted).toBe(6);
+    expect(byKey.rfis!.inserted).toBe(1);
+    expect(byKey.qaqc!.inserted).toBe(1);
     expect(byKey.standards!.inserted).toBe(13);
+    expect((await db.select().from(schema.rfi)).length).toBe(1);
+    expect((await db.select().from(schema.schemaFeature)).length).toBe(219);
     expect(first.periods).toBe(80);
     expect(first.workflows).toBeGreaterThan(0);
 

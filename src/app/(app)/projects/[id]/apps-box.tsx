@@ -60,8 +60,8 @@ export function AppsBox({ projectId, apps, canEdit }: { projectId: string; apps:
       {canEdit ? (
         <ActionForm action={addAppAction} className="mt-2 flex flex-wrap items-center gap-2">
           <input type="hidden" name="projectId" value={projectId} />
-          <Input name="name" placeholder="Application name" className="h-8 w-44 text-xs" />
-          <Input name="url" placeholder="https://..." className="h-8 w-56 text-xs" />
+          <Input name="name" aria-label="Application name" placeholder="Application name" className="h-8 w-44 text-xs" />
+          <Input name="url" aria-label="Application link" placeholder="https://..." className="h-8 w-56 text-xs" />
           <SubmitButton size="sm" variant="secondary">
             Add
           </SubmitButton>

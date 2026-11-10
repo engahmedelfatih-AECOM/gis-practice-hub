@@ -58,18 +58,20 @@ export async function exportRegister(actor: Actor, key: RegisterKey, projectId?:
   const rows = await listRows(actor, key, { projectId });
   const extraFn = ["packages", "rfis", "qaqc", "resources", "updates"].includes(key) ? await registerExtras(key as "packages") : null;
   const extraLabels = extraFn ? Object.keys(extraFn(rows[0] ?? {})) : [];
+  // Calculated columns of the workbook are written once, from the derivations, not as empty cells.
+  const columns = def.fields.filter((f) => !f.derived);
   const wb = newWorkbook("AECOM GIS Practice Hub");
   const ws = wb.addWorksheet(def.sheet.slice(0, 31));
   ws.getCell("B1").value = def.sheet.toUpperCase();
   styleTitle(ws.getCell("B1"));
-  ws.mergeCells(1, 2, 1, Math.max(3, def.fields.length + extraLabels.length + 1));
+  ws.mergeCells(1, 2, 1, Math.max(3, columns.length + extraLabels.length + 1));
   ws.getCell("B2").value = def.description;
   styleSubtitle(ws.getCell("B2"));
-  const headers = ["#", ...def.fields.map((f) => f.label), ...extraLabels];
-  const dateCols = def.fields.map((f, i) => (f.type === "date" ? i + 1 : -1)).filter((i) => i >= 0);
+  const headers = ["#", ...columns.map((f) => f.label), ...extraLabels];
+  const dateCols = columns.map((f, i) => (f.type === "date" ? i + 1 : -1)).filter((i) => i >= 0);
   const data = rows.map((r, i) => [
     i + 1,
-    ...def.fields.map((f) => {
+    ...columns.map((f) => {
       const v = r[f.key];
       if (f.type === "project") return (r.projectName as string) ?? null;
       if (f.type === "pct") return v === null || v === undefined ? null : Number(v) / 100;
@@ -80,13 +82,13 @@ export async function exportRegister(actor: Actor, key: RegisterKey, projectId?:
   const end = writeTable(ws, 4, 1, headers, data, { dateCols });
   // colour the status-like cells as the sheet does
   rows.forEach((r, ri) => {
-    def.fields.forEach((f, ci) => {
+    columns.forEach((f, ci) => {
       if (f.type !== "select") return;
       const f2 = TONE_FILL[toneKey(r[f.key] as string)];
       if (f2) ws.getCell(5 + ri, 2 + ci).fill = fill(f2);
-      if (f.type === "select" && toneKey(r[f.key] as string) === "black") ws.getCell(5 + ri, 2 + ci).font = { name: "Arial", size: 9, color: { argb: XLSX_COLOURS.white } };
+      if (toneKey(r[f.key] as string) === "black") ws.getCell(5 + ri, 2 + ci).font = { name: "Arial", size: 9, color: { argb: XLSX_COLOURS.white } };
     });
-    def.fields.forEach((f, ci) => {
+    columns.forEach((f, ci) => {
       if (f.type === "pct") ws.getCell(5 + ri, 2 + ci).numFmt = "0%";
     });
   });
@@ -208,7 +210,7 @@ export async function exportTracker(actor: Actor, projectId: string, format: "xl
   assertCan(actor, "export:run");
   const t = await deliveryTracker(actor, projectId);
   const base = `${t.project.name.replace(/[^A-Za-z0-9]+/g, "_")}_GIS_Tracker`;
-  const rows = t.rows.map((r) => [r.n, r.disciplineStage, r.designApprovalDate, r.gisStartDate, r.plannedSubmission, r.actualSubmission, r.assignedTo, r.qaqcResult, r.status, r.clientReviewStatus, r.clientCommentRef, r.revisionNo, r.resubmissionDate, r.approvalDate, r.daysOverdue, r.progressPct / 100, r.remarks]);
+  const rows = t.rows.map((r) => [r.n, r.disciplineStage, r.designApprovalDate, r.gisStartDate, r.plannedSubmission, r.actualSubmission, r.assignedTo, r.qaqcResult, r.status, r.clientReviewStatus, r.clientCommentRef, r.revisionNo, r.resubmissionDate, r.approvalDate, r.daysOverdue, r.progressPct === null ? null : r.progressPct / 100, r.remarks]);
   const s = t.summary;
   if (format === "xlsx") {
     const wb = newWorkbook("AECOM GIS Practice Hub");

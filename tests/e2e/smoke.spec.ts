@@ -54,7 +54,8 @@ test.describe("GIS Hub smoke", () => {
     await page.getByRole("button", { name: "Add row" }).click();
     await expect(page).toHaveURL(/\/packages\?saved=1/);
     await page.goto(`/delivery-tracker?project=${projectId}`);
-    await expect(page.getByRole("cell", { name: "Roads & Highways (DD)" })).toBeVisible();
+    // The tracker prints the workbook's "<stage code> - <discipline>" label (report 2026-11-02, m1).
+    await expect(page.getByRole("cell", { name: "DD - Roads & Highways" })).toBeVisible();
     await expect(page.getByText("Overall progress")).toBeVisible();
 
     await page.goto("/admin/audit?entityType=project&action=project.create");

@@ -109,7 +109,8 @@ export const pkg = pgTable(
     plannedSubmission: date(),
     actualSubmission: date(),
     approvalDate: date(),
-    progressPct: integer().notNull().default(0),
+    /** Blank in the workbook stays null (the tracker averages filled cells only). */
+    progressPct: integer(),
     assignedTo: text(),
     remarks: text(),
     designApprovalDate: date(),
@@ -170,12 +171,18 @@ export const resourceRow = pgTable(
     allocatedTo: date(),
     plannedHours: numeric({ precision: 8, scale: 2 }),
     actualHours: numeric({ precision: 8, scale: 2 }),
+    /** Utilisation % typed from the workbook dropdown (0 to 120). */
+    utilisationPct: integer(),
     availabilityNext: text(),
     remarks: text(),
     ...versionColumn,
     ...timestamps,
   },
-  (t) => [index("resource_row_project_idx").on(t.projectId), index("resource_row_name_idx").on(t.name)],
+  (t) => [
+    index("resource_row_project_idx").on(t.projectId),
+    index("resource_row_name_idx").on(t.name),
+    check("resource_row_utilisation_chk", sql`${t.utilisationPct} between 0 and 120`),
+  ],
 );
 
 /** Updates sheet: accomplishments, priorities and concerns per project and period. */
@@ -232,7 +239,8 @@ export const rfi = pgTable(
   {
     id: uuid().primaryKey().defaultRandom(),
     sortOrder: integer().notNull().default(0),
-    rfiNo: text().notNull(),
+    /** Calculated in the workbook ("RFI-001" per project); kept for files imported earlier. */
+    rfiNo: text(),
     projectId: uuid().references(() => project.id, { onDelete: "set null" }),
     designStage: text(),
     discipline: text(),
@@ -244,7 +252,8 @@ export const rfi = pgTable(
     response: text(),
     respondedBy: text(),
     responseDate: date(),
-    status: text().notNull().default("Open"),
+    /** Blank is allowed (workbook): a blank RFI is neither open nor closed. */
+    status: text(),
     remarks: text(),
     ...versionColumn,
     ...timestamps,

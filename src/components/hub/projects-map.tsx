@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import maplibregl from "maplibre-gl";
+// MapLibre 6 has no default export; every class is a named import.
+import { LngLatBounds, Map as MapLibreMap, Marker, NavigationControl, Popup, type MapOptions } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 
 export interface MapPoint {
@@ -24,7 +25,7 @@ const COLOURS: Record<string, string> = {
 };
 
 /** Built-in raster style (OpenStreetMap tiles) used when no style URL is set in Settings. */
-const OSM_STYLE: maplibregl.StyleSpecification = {
+const OSM_STYLE: NonNullable<MapOptions["style"]> = {
   version: 8,
   sources: {
     osm: {
@@ -42,27 +43,28 @@ export function ProjectsMap({ points, center }: { points: MapPoint[]; center: { 
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!ref.current) return;
-    const map = new maplibregl.Map({
+    const map = new MapLibreMap({
       container: ref.current,
       style: center.styleUrl || OSM_STYLE,
       center: [center.lng, center.lat],
       zoom: center.zoom,
       attributionControl: { compact: true },
     });
-    map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
+    map.addControl(new NavigationControl({ showCompass: false }), "top-right");
     const markers = points.map((p) => {
       const el = document.createElement("button");
       el.type = "button";
       el.title = p.name;
       el.setAttribute("aria-label", `${p.name} - ${p.status}`);
-      el.style.cssText = `width:16px;height:16px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.3);background:${COLOURS[p.status] ?? "var(--earth-green)"};cursor:pointer`;
-      const popup = new maplibregl.Popup({ offset: 12 }).setHTML(
+      // Colours come from the AECOM tokens only (the ring uses the surface token, not a raw hex).
+      el.style.cssText = `width:16px;height:16px;border-radius:50%;border:2px solid var(--surface);box-shadow:0 0 0 1px var(--black-25);background:${COLOURS[p.status] ?? "var(--earth-green)"};cursor:pointer`;
+      const popup = new Popup({ offset: 12 }).setHTML(
         `<strong>${escape(p.name)}</strong><br/>${escape(p.client ?? "")}<br/>${escape(p.status)}${p.label ? `<br/>${escape(p.label)}` : ""}<br/><a href="/projects/${p.id}">Open update page</a>`,
       );
-      return new maplibregl.Marker({ element: el }).setLngLat([p.lng, p.lat]).setPopup(popup).addTo(map);
+      return new Marker({ element: el }).setLngLat([p.lng, p.lat]).setPopup(popup).addTo(map);
     });
     if (points.length > 1) {
-      const b = new maplibregl.LngLatBounds();
+      const b = new LngLatBounds();
       points.forEach((p) => b.extend([p.lng, p.lat]));
       map.fitBounds(b, { padding: 60, maxZoom: 9, duration: 0 });
     }

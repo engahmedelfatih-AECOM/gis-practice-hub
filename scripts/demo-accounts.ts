@@ -4,6 +4,7 @@ import { and, eq, isNull } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import * as schema from "../src/infrastructure/db/schema";
+import type { Role } from "../src/domain/shared/enums";
 
 /**
  * Demo accounts for a hosted demonstration (one per role). Idempotent: creates missing users,
@@ -13,11 +14,13 @@ import * as schema from "../src/infrastructure/db/schema";
  *
  * Never run against a production database: it sets known passwords.
  */
-const ACCOUNTS = [
-  { email: "manager.demo@aecom.com", name: "Demo GIS Manager", role: "GIS_MANAGER" as const },
-  { email: "lead.demo@aecom.com", name: "Demo GIS Lead", role: "GIS_LEAD" as const },
-  { email: "specialist.demo@aecom.com", name: "Demo GIS Specialist", role: "GIS_SPECIALIST" as const },
-  { email: "viewer.demo@aecom.com", name: "Demo Viewer", role: "VIEWER" as const },
+const ACCOUNTS: { email: string; name: string; role: Role; region?: string }[] = [
+  { email: "manager.demo@aecom.com", name: "Demo GIS Manager", role: "GIS_MANAGER" },
+  { email: "lead.demo@aecom.com", name: "Demo GIS Lead", role: "GIS_LEAD" },
+  { email: "specialist.demo@aecom.com", name: "Demo GIS Specialist", role: "GIS_SPECIALIST" },
+  { email: "viewer.demo@aecom.com", name: "Demo Viewer", role: "VIEWER" },
+  // A lead of one hub only, so the REGION scope can be seen and tested (report 2026-11-02, B2).
+  { email: "lead.india.demo@aecom.com", name: "Demo GIS Lead (India)", role: "GIS_LEAD", region: "India" },
 ];
 
 async function main() {
@@ -35,6 +38,10 @@ async function main() {
         .from(schema.appUser)
         .orderBy(schema.appUser.createdAt)
         .limit(1);
+      const regions = await tx
+        .select({ id: schema.listItem.id, value: schema.listItem.value })
+        .from(schema.listItem)
+        .where(eq(schema.listItem.listKey, "region"));
       const hash = await hashPassword(password);
       for (const a of ACCOUNTS) {
         let [user] = await tx.select().from(schema.appUser).where(eq(schema.appUser.email, a.email));
@@ -53,20 +60,35 @@ async function main() {
         } else {
           await tx.insert(schema.authAccount).values({ userId: user!.id, accountId: user!.id, providerId: "credential", password: hash });
         }
+        const region = a.region ? regions.find((r) => r.value.trim() === a.region) : undefined;
+        if (a.region && !region) {
+          console.log(`${a.email}: skipped, the region "${a.region}" is not in the Hub / Region list yet`);
+          continue;
+        }
+        const scopeType = region ? "REGION" : "GLOBAL";
+        const scopeId = region?.id ?? null;
         const [grant] = await tx
           .select()
           .from(schema.roleAssignment)
-          .where(and(eq(schema.roleAssignment.userId, user!.id), eq(schema.roleAssignment.role, a.role), isNull(schema.roleAssignment.revokedAt)));
+          .where(
+            and(
+              eq(schema.roleAssignment.userId, user!.id),
+              eq(schema.roleAssignment.role, a.role),
+              eq(schema.roleAssignment.scopeType, scopeType),
+              scopeId ? eq(schema.roleAssignment.scopeId, scopeId) : isNull(schema.roleAssignment.scopeId),
+              isNull(schema.roleAssignment.revokedAt),
+            ),
+          );
         if (!grant) {
           await tx.insert(schema.roleAssignment).values({
             userId: user!.id,
             role: a.role,
-            scopeType: "GLOBAL",
-            scopeId: null,
+            scopeType,
+            scopeId,
             grantedBy: admin?.id ?? user!.id,
           });
         }
-        console.log(`${a.email}: ${a.role}`);
+        console.log(`${a.email}: ${a.role}${region ? ` (REGION ${region.value})` : ""}`);
       }
     });
   } finally {
