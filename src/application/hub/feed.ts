@@ -4,7 +4,7 @@ import { listRows } from "./registers";
 import { projectsView } from "./views";
 
 /**
- * Read-only JSON feeds for the Resource Planner link (keyed by project name and job number).
+ * Read-only JSON feeds for the Resource Planner link (keyed by the Project Number, with the project name and job number).
  * The planner owns the project record; the hub tells it the delivery status.
  */
 export async function feedProjects() {
@@ -16,6 +16,7 @@ export async function feedProjects() {
       id: p.id,
       name: p.name,
       jobNo: p.jobNo,
+      projectNumber: p.projectNumber,
       client: p.client,
       status: p.status,
       currentDesignStage: p.currentDesignStage,

@@ -4,6 +4,12 @@
 
 Current screen: Project form of the Hub: Project Name and Job No., no Project Number.
 
+Status: built on 2026-11-10 (branch `feat/project-number`). The screenshot shows the screen before the change.
+
+As built: the workbook layout is not changed. The import reads a "Project Number" column only when the
+Projects sheet has one, and never empties a number kept in the Hub. Assumption to confirm: the planner
+Project Number is the master.
+
 ## Today
 
 - A Hub project is identified by its name. Job No. is optional free text.

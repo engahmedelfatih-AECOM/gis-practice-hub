@@ -67,6 +67,25 @@ test.describe("Role walk-through on the sample workbook", () => {
     await expect(page.getByText(DENIED)).toBeVisible();
   });
 
+  test("the GIS Manager fills the Project Number of an existing project", async ({ page }) => {
+    test.setTimeout(120_000);
+    await signIn(page, ACCOUNTS.manager);
+    await page.goto("/projects");
+    await page.getByRole("link", { name: "Project numbers" }).click();
+    await expect(page.getByRole("heading", { name: "Project numbers" })).toBeVisible();
+    const number = `E2E-${Date.now().toString().slice(-6)}`;
+    await page.getByLabel("Project Number of QIC D9", { exact: true }).fill(number);
+    await page.getByRole("button", { name: "Save numbers" }).click();
+    await expect(page.getByText("1 project number saved.")).toBeVisible();
+    // The number is on the register, and a second project cannot take it.
+    await page.goto("/projects");
+    await expect(page.getByRole("cell", { name: number, exact: true })).toBeVisible();
+    await page.goto("/projects/numbers");
+    await page.getByLabel("Project Number of Masdar City", { exact: true }).fill(number);
+    await page.getByRole("button", { name: "Save numbers" }).click();
+    await expect(page.getByText(/typed on two projects/)).toBeVisible();
+  });
+
   test("the Viewer reads the Hub and cannot change a row", async ({ page }) => {
     test.setTimeout(120_000);
     await signIn(page, ACCOUNTS.viewer);

@@ -164,7 +164,12 @@ export interface ParsedRegister {
   warnings: string[];
   /** Sheet rows that carried data but were left out, with the reason (counted in the summary). */
   skipped: number;
+  /** Field keys whose column was found on the sheet. A field without a column is never written. */
+  columns: string[];
 }
+
+/** Project fields that exist only in the Hub; the import writes them only when the sheet has their column. */
+const HUB_ONLY_PROJECT_FIELDS = ["projectNumber", "latitude", "longitude", "locationLabel"] as const;
 
 /** At most this many warning lines are kept; the rest are summarised in one line. */
 const MAX_WARNINGS = 200;
@@ -223,7 +228,7 @@ function parseField(f: FieldDef, raw: Cell, warnings: string[], where: string): 
 
 function parseRegister(wb: ExcelJS.Workbook, def: RegisterDef, warnings: string[]): ParsedRegister {
   const ws = wb.getWorksheet(def.sheet);
-  const out: ParsedRegister = { key: def.key, sheet: def.sheet, found: Boolean(ws), rows: [], warnings: [], skipped: 0 };
+  const out: ParsedRegister = { key: def.key, sheet: def.sheet, found: Boolean(ws), rows: [], warnings: [], skipped: 0, columns: [] };
   if (!ws) return out;
   const headers = headerMap(ws, 5);
   const cols = new Map<string, number>();
@@ -231,6 +236,7 @@ function parseRegister(wb: ExcelJS.Workbook, def: RegisterDef, warnings: string[
     const col = headers.get(norm(f.label)) ?? headers.get(norm(f.label.replace(/\s*\(paste URL\)/i, "")));
     if (col) cols.set(f.key, col);
   }
+  out.columns = [...cols.keys()];
   // Updates of the older workbook: "Report Period" text instead of Period From / To.
   const reportPeriodCol = def.key === "updates" ? headers.get("report period") : undefined;
   // Projects: the "Report Sheet" column names the update sheet (workflow and apps live there).
@@ -286,7 +292,7 @@ function parseRegister(wb: ExcelJS.Workbook, def: RegisterDef, warnings: string[
     (f) =>
       !f.derived &&
       !cols.has(f.key) &&
-      !["latitude", "longitude", "locationLabel", "periodFrom", "periodTo", "meetingDate"].includes(f.key),
+      !["latitude", "longitude", "locationLabel", "projectNumber", "periodFrom", "periodTo", "meetingDate"].includes(f.key),
   );
   if (missing.length) addWarning(warnings, `${def.sheet}: columns not found and left empty: ${missing.map((f) => f.label).join(", ")}.`);
   const extra = [...headers.keys()].filter((h) => ![...cols.keys()].some((k) => norm(def.fields.find((f) => f.key === k)?.label ?? "") === h));
@@ -548,6 +554,9 @@ async function applyHub(tx: Tx, parsed: ParsedWorkbook, dryRun: boolean): Promis
   const projectsParsed = parsed.registers.find((r) => r.key === "projects")!;
   const existingProjects = await tx.select().from(project);
   const projectIdByName = new Map(existingProjects.map((p) => [norm(p.name), p.id]));
+  const numberOwner = new Map(existingProjects.filter((p) => p.projectNumber).map((p) => [norm(p.projectNumber), norm(p.name)]));
+  if (projectsParsed.found && !projectsParsed.columns.includes("projectNumber"))
+    addWarning(summary.warnings, "Projects: no Project Number column on the sheet; the numbers kept in the Hub are unchanged.");
   const allowed = await allowedValues(tx, parsed);
   let inserted = 0;
   let updated = 0;
@@ -561,6 +570,23 @@ async function applyHub(tx: Tx, parsed: ParsedWorkbook, dryRun: boolean): Promis
     }
     const values = { ...splitJson(REGISTERS.projects, flat), sortOrder: i + 1 } as Record<string, unknown>;
     if (!values.status) values.status = "Not Started";
+    // Fields the workbook does not carry (the map location, the Project Number) belong to the Hub:
+    // a sheet without their column must not empty them.
+    for (const k of HUB_ONLY_PROJECT_FIELDS) if (!projectsParsed.columns.includes(k)) delete values[k];
+    // The Project Number is unique: a number met twice in the file, or already on another project,
+    // is left out with a warning, so one typing slip does not stop the whole import.
+    const number = typeof values.projectNumber === "string" ? values.projectNumber.trim() : "";
+    if ("projectNumber" in values) {
+      const owner = number ? numberOwner.get(norm(number)) : undefined;
+      if (number && owner && owner !== norm(flat.name)) {
+        addWarning(summary.warnings, `Projects row ${flat.__row}: Project Number ${number} is already used by another project; the number was left unchanged.`);
+        delete values.projectNumber;
+      } else {
+        values.projectNumber = number || null;
+        if (number) numberOwner.set(norm(number), norm(flat.name));
+      }
+    }
+    delete values.__row;
     const id = projectIdByName.get(norm(flat.name));
     if (id) {
       updated++;

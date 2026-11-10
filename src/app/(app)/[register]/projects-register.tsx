@@ -39,6 +39,11 @@ export function ProjectsRegister({
             <ButtonLink href={exportHref} variant="secondary">
               Export to Excel
             </ButtonLink>
+            {canAdd ? (
+              <ButtonLink href="/projects/numbers" variant="secondary">
+                Project numbers
+              </ButtonLink>
+            ) : null}
             {canAdd ? <ButtonLink href="/projects/new">New project</ButtonLink> : null}
           </>
         }
@@ -52,6 +57,7 @@ export function ProjectsRegister({
               {th("Project Name")}
               {th("Client")}
               {th("Job No.")}
+              {th("Project Number")}
               {th("Current Design Stage")}
               {th("Project Status")}
               {th("GIS Lead")}
@@ -90,6 +96,7 @@ export function ProjectsRegister({
                 </td>
                 <td className="px-2 py-1.5">{p.client}</td>
                 <td className="px-2 py-1.5">{p.jobNo}</td>
+                <td className="px-2 py-1.5 whitespace-nowrap">{p.projectNumber}</td>
                 <td className="px-2 py-1.5 whitespace-nowrap">{p.currentDesignStage}</td>
                 <td className="px-2 py-1.5">
                   <span className={cn("inline-block rounded px-1.5 py-0.5 whitespace-nowrap", toneClass(p.status))}>{p.status}</span>

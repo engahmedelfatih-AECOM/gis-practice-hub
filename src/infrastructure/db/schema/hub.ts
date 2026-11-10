@@ -66,6 +66,8 @@ export const project = pgTable(
     name: text().notNull(),
     client: text(),
     jobNo: text(),
+    /** The Project Number of the Resource Planner: the shared key between the two applications. Not in the workbook. */
+    projectNumber: text(),
     currentDesignStage: text(),
     status: text().notNull().default("Not Started"),
     gisLead: text(),
@@ -88,7 +90,7 @@ export const project = pgTable(
     ...versionColumn,
     ...timestamps,
   },
-  (t) => [uniqueIndex("project_name_uq").on(t.name), index("project_status_idx").on(t.status)],
+  (t) => [uniqueIndex("project_name_uq").on(t.name), uniqueIndex("project_number_uq").on(t.projectNumber), index("project_status_idx").on(t.status)],
 );
 
 /** Packages sheet: one row per discipline package per design stage. */
