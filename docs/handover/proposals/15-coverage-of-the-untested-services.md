@@ -1,0 +1,25 @@
+# 15 - Coverage of the untested services
+
+![Master Trackers (client schemas), one of the services without tests](img/15-client-schemas.png)
+
+Current screen: Master Trackers (client schemas), one of the services without tests.
+
+## Today
+
+- Tested today: import, registers, lists, periods, settings, scope, parity. Not tested: project extras, client schemas, feed, API keys, audit read; in the planner the GIS import, bids import, calendars, staff roles, clients and job token.
+- Two defects reached the live Hub on 2026-11-10 because the tests always ran on a loaded database: the Updates page on an empty register, and the workflow strip read as applications.
+
+## The change
+
+- Tests for each untested service, one file at a time, to 60 % lines and above.
+- Every page opened once on an empty database and once on the sample, in the end-to-end run.
+
+## Benefit for the team
+
+- A change cannot break these screens unnoticed.
+- The two defects of 2026-11-10 would have been caught before the merge.
+
+## Effort and dependencies
+
+- Effort: Medium - 3 to 4 days, can be split
+- Depends on: None.
