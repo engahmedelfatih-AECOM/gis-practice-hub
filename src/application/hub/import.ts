@@ -365,9 +365,12 @@ function parseReportSheet(ws: ExcelJS.Worksheet | undefined) {
     const status = asText(cellValue(ws.getRow(r).getCell(14))) ?? "Not Started";
     steps.push({ name, status: ["Completed", "In Progress", "Not Started"].includes(status) ? status : "Not Started" });
   }
-  for (let r = 26; r <= 33; r++) {
+  // The table starts on row 26 and ends at its "Type here..." hint row (row 28 until someone
+  // inserts more app rows). The workflow strip starts right below it and must not be read as apps.
+  for (let r = 26; r <= 40; r++) {
     const name = asText(cellValue(ws.getRow(r).getCell(26)));
-    if (!name || /^type here/i.test(name)) continue;
+    if (name && /^type here/i.test(name)) break;
+    if (!name) continue;
     apps.push({ name, url: asText(cellValue(ws.getRow(r).getCell(32))) });
   }
   return { steps, apps };
