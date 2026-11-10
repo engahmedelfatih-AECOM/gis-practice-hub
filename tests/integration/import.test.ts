@@ -13,6 +13,15 @@ beforeEach(resetDb);
 const fixture = () => readFileSync(path.join(process.cwd(), "tests/fixtures/GIS_Practice_Hub_sample.xlsx"));
 
 describe("workbook import", () => {
+  it("reads the GIS Enterprise Applications table only, not the workflow strip below it", async () => {
+    const a = await admin();
+    await importHubWorkbook(a, { name: "hub.xlsx", buffer: fixture() }, false);
+    const apps = await db.select().from(schema.enterpriseApp);
+    // The sample has one application, on the ML04 sheet. Before the fix the import also read the
+    // workflow circles and step names under the table as 30 more "applications".
+    expect(apps.map((x) => x.name)).toEqual(["ML04 / RTA 3D Scene Viewer (AECOM Portal)"]);
+  });
+
   it("dry run counts rows without writing, then apply loads every sheet idempotently", async () => {
     const a = await admin();
     const dry = await importHubWorkbook(a, { name: "hub.xlsx", buffer: fixture() }, true);

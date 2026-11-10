@@ -18,6 +18,10 @@ and 10; the planner admin e-mail is still unresolved (section 10); database deci
 (section 10 and `09_Systems_Development/03_Shared/04_Database/DB_Expiry_Options_resource-planner-db.md`
 in the Project files).
 
+Revision 4 on 2026-11-10: with the owner's go the fix branches and the planner split were merged
+and deployed, the RACI change A9 was built, two defects found on the live Hub were fixed, and one
+proposal page per backlog item was written under `docs/handover/proposals/`.
+
 Revision 3 on 2026-11-03 (thread "Fix the test report findings"): the Render database was upgraded
 by the owner, the findings of TEST_AND_GAP_REPORT_2026-11-02.md were fixed on two branches
 (`fix/hub-report-2026-11-02` and `fix/planner-report-2026-11-02`), and the re-run results are in
@@ -463,6 +467,7 @@ dropdown behaviour, formulas) follows the workbook.
 | 2026-11-03 | The machine feed keeps a global system actor; only human sessions are region-scoped | A key belongs to a system, not to a hub (report B2) |
 | 2026-11-03 | The API key travels in the `x-api-key` header only; a key in the query string is refused with 400 | A key in a URL ends up in access logs and proxy caches (report m14) |
 | 2026-11-10 | Hub PR #1 merged into main by the owner's go; RACI change A9 approved: the GIS Specialist no longer edits the QA/QC register, the GIS Lead no longer edits the client schema (both still read them) | GIS-STD-001 3.5: the QA/QC result is the Lead's R/A; the client schema dictionary is the Specialist's R with the Manager accountable |
+| 2026-11-10 | "Go all" by the owner: Hub PR #3, planner PR #9 and PR #8 merged; the drop of the 13 old hub tables of the planner database accepted | Sample data only; the Hub keeps its own database |
 
 ---
 
@@ -470,11 +475,10 @@ dropdown behaviour, formulas) follows the workbook.
 
 Added 2026-11-03 (from the fix branches):
 
-- RACI change A9: approved by the owner on 2026-11-10 and built in `permissions.ts` (branch
-  `feat/raci-a9`).
-- Merge of the two fix branches: `fix/hub-report-2026-11-02` into `gis-practice-hub` main (which
-  auto-deploys) and `fix/planner-report-2026-11-02` into `resource-planner` `split-planner`. Both
-  wait for the owner's go, as PR #8 does.
+- Built and merged on 2026-11-10, no longer open: the RACI change A9 (Hub PR #2) and the merges of
+  the fix branches (Hub PR #1, planner PR #9 and PR #8).
+- Proposals for the owner to choose from: one page per backlog item under
+  `docs/handover/proposals/` (2026-11-10). Nothing in them is built.
 - Five Status values on the Schema Tracker of the real workbook are not on the Lists sheet
   ("SK to investigate requirements" three times, "Complete at 15%" twice) and one QA/QC row has no
   package name. The import warns about each one; the team corrects the sheet.
@@ -565,8 +569,7 @@ Both:
 - Demo account scripts (both apps) reset the demo passwords and re-grant missing roles on every
   start while `DEMO_ACCOUNTS_PASSWORD` is set, but they do not re-activate a deactivated account.
   Deactivate the demo users in-app and remove the variable on Render.
-- Fixed 2026-11-03 on the fix branches, listed here because the live services still run the old
-  code until the owner merges: the import defects (B1, M2 to M5), REGION scope on every read and
+- Fixed 2026-11-03 and live since 2026-11-10: the import defects (B1, M2 to M5), REGION scope on every read and
   write (B2), the specialist progress save (B3), the feed behind the proxy (B4) and the rules that
   disagreed with the workbook (M6, M7, M10, M11, m1 to m3).
 - Found while testing on 2026-11-03 and fixed in the same branch: a row of the Projects register
@@ -575,8 +578,17 @@ Both:
 - The workbook's Projects sheet has "Dubai" typed over the formula in the GIS Resources Region cell
   of QIC D9, while the people on the project sit in South Africa. The Hub follows the formula; the
   team corrects the sheet. The parity test records this as the one accepted difference.
-- The Render services still run the code of `main` and `split-planner`: nothing of the 2026-11-03
-  work is deployed yet.
+- Live on Render since 2026-11-10, by the owner's go: Hub PR #1 (fixes), #2 (RACI A9) and #3, and
+  the planner PR #9 and PR #8 (the split; its migration 0010 dropped the 13 old hub tables of the
+  planner database, sample data only). Both repositories now work from `main`.
+- Found on the live Hub on 2026-11-10 and fixed: the Updates register page failed when the register
+  was empty (PR #3), and the import read the workflow strip under the GIS Enterprise Applications
+  table as 30 extra applications on the sample. Both passed the tests because every test ran on a
+  loaded database; a test now opens the calculated columns of every empty register.
+- The cloud sessions cannot open `*.onrender.com`, so a live check is the Render log plus a look by
+  the owner in a browser.
+- The API keys page of the Hub still carries the planner's wording ("allocations, capacity",
+  "sync_planner.py"). Wording only; listed in proposal 03.
 - Render free services spin down after inactivity; the first request takes about a minute.
 - Hub database lives on the planner's free PostgreSQL instance (shared-instance mode), so the
   expiry above affects both applications at once. `pg_dump` before bulk imports.
@@ -1175,6 +1187,10 @@ each one rests on and what still carries a [VERIFY] marker.
 | 17 Diagram | sections 2 and 6 | high | none |
 | 18 Bundled files | docs/handover listing | high | none |
 | 19 and 20 Project texts | the rules of this session | n/a | none |
+
+Revision 4 re-check on 2026-11-10: the merges and the RACI change are done and live (sections 8, 9
+and 10), the proposals are under `docs/handover/proposals/`. Still open: the planner seeded admin
+e-mail, the owner's look at both live applications, and his choice from the proposals.
 
 Revision 3 re-check on 2026-11-03: sections 8, 9 and 10 carry the database upgrade, the business
 decisions of the fix branches and the RACI question that waits on the owner; the test results are
