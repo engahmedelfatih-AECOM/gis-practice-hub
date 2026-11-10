@@ -48,6 +48,8 @@ const EVERYONE: Grant[] = [
 const EDITORS: Grant[] = [A("ADMINISTRATOR"), A("GIS_MANAGER"), A("GIS_LEAD"), A("GIS_SPECIALIST")];
 const LEADS: Grant[] = [A("ADMINISTRATOR"), A("GIS_MANAGER"), A("GIS_LEAD")];
 const MANAGERS: Grant[] = [A("ADMINISTRATOR"), A("GIS_MANAGER")];
+// The client schema dictionary is maintained by the specialist, with the manager accountable.
+const SCHEMA_OWNERS: Grant[] = [A("ADMINISTRATOR"), A("GIS_MANAGER"), A("GIS_SPECIALIST")];
 const ADMIN: Grant[] = [A("ADMINISTRATOR")];
 
 export const PERMISSIONS: Record<Action, readonly Grant[]> = {
@@ -62,13 +64,15 @@ export const PERMISSIONS: Record<Action, readonly Grant[]> = {
   "update:manage": LEADS,
   "risk:manage": EDITORS,
   "rfi:manage": EDITORS,
-  "qaqc:manage": EDITORS,
+  // QA/QC result: the GIS Lead is R/A, so a specialist does not sign off their own work (A9, 2026-11-10).
+  "qaqc:manage": LEADS,
   "standard:manage": MANAGERS,
   "innovation:manage": EDITORS,
   "workflow:manage": LEADS,
   "list:manage": MANAGERS,
   "period:manage": MANAGERS,
-  "clientSchema:manage": EDITORS,
+  // Client schema: specialist R, manager A; the lead reads it through hub:read (A9, 2026-11-10).
+  "clientSchema:manage": SCHEMA_OWNERS,
   "export:run": EVERYONE,
   "user:read": ADMIN,
   "user:manage": ADMIN,

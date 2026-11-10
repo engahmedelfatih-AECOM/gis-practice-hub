@@ -4,6 +4,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { importHubWorkbook } from "@/application/hub/import";
 import { dashboard, projectsView, registerExtras } from "@/application/hub/views";
 import { listRows } from "@/application/hub/registers";
+import { listPeriods } from "@/application/hub/periods";
 import { admin, resetDb } from "./helpers";
 
 /**
@@ -42,8 +43,11 @@ describe("workbook parity", () => {
       { name: "hub.xlsx", buffer: readFileSync(path.join(process.cwd(), "tests/fixtures/GIS_Practice_Hub_sample.xlsx")) },
       false,
     );
-    rows = (await projectsView(a)).rows;
-    dash = await dashboard(a);
+    // Compare on the period Excel calculated for, not on today's period, so the test does not
+    // depend on the date it runs.
+    const period = (await listPeriods()).find((p) => p.startDate === fx.dashboard.periodStart);
+    rows = (await projectsView(a, period?.id)).rows;
+    dash = await dashboard(a, period?.id);
   });
 
   it("reads the fixture that was generated from the sample", () => {

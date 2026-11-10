@@ -59,6 +59,23 @@ describe("permission matrix (GIS-STD-001 RACI)", () => {
   });
 });
 
+describe("RACI change A9 (approved 2026-11-10)", () => {
+  it("the QA/QC register is edited by the lead, the manager and the administrator, not the specialist", () => {
+    expect(can(principal("GIS_LEAD"), "qaqc:manage")).toBe(true);
+    expect(can(principal("GIS_MANAGER"), "qaqc:manage")).toBe(true);
+    expect(can(principal("GIS_SPECIALIST"), "qaqc:manage")).toBe(false);
+    expect(can(principal("VIEWER"), "qaqc:manage")).toBe(false);
+  });
+
+  it("the client schema is edited by the specialist and the manager, and only read by the lead", () => {
+    expect(can(principal("GIS_SPECIALIST"), "clientSchema:manage")).toBe(true);
+    expect(can(principal("GIS_MANAGER"), "clientSchema:manage")).toBe(true);
+    expect(can(principal("GIS_LEAD"), "clientSchema:manage")).toBe(false);
+    expect(can(principal("GIS_LEAD"), "hub:read")).toBe(true);
+    expect(can(principal("VIEWER"), "clientSchema:manage")).toBe(false);
+  });
+});
+
 describe("region scope", () => {
   it("a region-scoped lead edits rows of their region only", () => {
     const l = principal("GIS_LEAD", R1);

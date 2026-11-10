@@ -462,6 +462,7 @@ dropdown behaviour, formulas) follows the workbook.
 | 2026-11-03 | An Updates row with no description is not a row (the sample's count goes from 12 to 11) | Same key-cell rule as every other register |
 | 2026-11-03 | The machine feed keeps a global system actor; only human sessions are region-scoped | A key belongs to a system, not to a hub (report B2) |
 | 2026-11-03 | The API key travels in the `x-api-key` header only; a key in the query string is refused with 400 | A key in a URL ends up in access logs and proxy caches (report m14) |
+| 2026-11-10 | Hub PR #1 merged into main by the owner's go; RACI change A9 approved: the GIS Specialist no longer edits the QA/QC register, the GIS Lead no longer edits the client schema (both still read them) | GIS-STD-001 3.5: the QA/QC result is the Lead's R/A; the client schema dictionary is the Specialist's R with the Manager accountable |
 
 ---
 
@@ -469,11 +470,8 @@ dropdown behaviour, formulas) follows the workbook.
 
 Added 2026-11-03 (from the fix branches):
 
-- RACI change waiting for the owner's go: GIS Specialist loses `qaqc:manage` (the QA/QC result is
-  the GIS Lead's R/A) and the GIS Lead keeps reading the client schema but loses
-  `clientSchema:manage` (the master tracker dictionary is the Specialist's R with the Manager
-  accountable). Reading is unchanged for both, because it comes from `hub:read`. The matrix was
-  put to the owner on 2026-11-03; nothing is changed in `permissions.ts` until he answers.
+- RACI change A9: approved by the owner on 2026-11-10 and built in `permissions.ts` (branch
+  `feat/raci-a9`).
 - Merge of the two fix branches: `fix/hub-report-2026-11-02` into `gis-practice-hub` main (which
   auto-deploys) and `fix/planner-report-2026-11-02` into `resource-planner` `split-planner`. Both
   wait for the owner's go, as PR #8 does.
