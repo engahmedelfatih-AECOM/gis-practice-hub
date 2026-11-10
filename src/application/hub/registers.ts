@@ -359,3 +359,48 @@ export async function moveRow(actor: Actor, key: RegisterKey, rawId: unknown, di
     await tx.update(table).set({ sortOrder: current } as never).where(eq(table.id, n.id));
   });
 }
+
+/**
+ * Set the Project Number of several projects in one save (the one-off screen that fills the
+ * number for the projects already in the Hub). Input: `number:<project id>` to the typed value.
+ * Only changed rows are written; an empty value clears the number. The number is unique.
+ */
+export async function setProjectNumbers(actor: Actor, raw: Record<string, unknown>): Promise<number> {
+  const entries: { id: string; number: string | null }[] = [];
+  for (const [key, value] of Object.entries(raw)) {
+    if (!key.startsWith("number:")) continue;
+    const id = parseInput(uuidSchema, key.slice("number:".length));
+    const number = parseInput(z.string().trim().max(60), typeof value === "string" ? value : "");
+    entries.push({ id, number: number || null });
+  }
+  const seen = new Map<string, string>();
+  for (const e of entries) {
+    if (!e.number) continue;
+    const k = e.number.toLowerCase();
+    if (seen.has(k)) throw validation(`Project Number ${e.number} is typed on two projects. Each number belongs to one project.`);
+    seen.set(k, e.id);
+  }
+  // Checked before the transaction: the region lookup reads outside it.
+  for (const e of entries) await assertManage(actor, REGISTERS.projects, e.id);
+  return withTx(async (tx) => {
+    const changes = [];
+    for (const e of entries) {
+      const [before] = await tx.select().from(project).where(eq(project.id, e.id)).limit(1);
+      if (!before) throw notFound("Project");
+      if ((before.projectNumber ?? null) !== e.number) changes.push({ ...e, before });
+    }
+    // Clear first, then set: two projects can swap their numbers in one save.
+    for (const c of changes) {
+      if (c.before.projectNumber) await tx.update(project).set({ projectNumber: null }).where(eq(project.id, c.id));
+    }
+    for (const c of changes) {
+      const [after] = await tx
+        .update(project)
+        .set({ projectNumber: c.number, version: sql`${project.version} + 1` })
+        .where(eq(project.id, c.id))
+        .returning();
+      await writeAudit(tx, actor, { action: "project.update", entityType: "project", entityId: c.id, before: c.before, after });
+    }
+    return changes.length;
+  });
+}

@@ -12,7 +12,7 @@ with `src/domain/hub/registers.ts` (columns) and `src/domain/hub/rules.ts` (form
 | Dashboard                               | `/` Dashboard                      | derived                | KPI tiles, status table, status chart, projects map (new).                          |
 | Project update sheets (one per project) | `/projects/[id]`                   | derived                | Built per period; nothing typed except the applications box and the workflow steps. |
 | Report Template                         | -                                  | -                      | Every project gets its page automatically.                                          |
-| Projects                                | `/projects`                        | `project`              | Stage chips MP to IFC in `stage_states`; CRS counters typed; location for the map.  |
+| Projects                                | `/projects`                        | `project`              | Stage chips MP to IFC in `stage_states`; CRS counters typed; location for the map; Project Number (Hub only, the key shared with the Resource Planner).  |
 | Packages                                | `/packages`                        | `package`              | Delivery columns included; Discipline Group and Days Overdue calculated.            |
 | Delivery Tracker                        | `/delivery-tracker?project=`       | derived                | Laheq layout, one project, Excel and PDF export.                                    |
 | Schema Tracker                          | `/schema-tracker`                  | `schema_feature`       | Project column kept as text; linked to the project when the name matches.           |

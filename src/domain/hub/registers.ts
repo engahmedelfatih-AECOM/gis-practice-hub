@@ -99,6 +99,7 @@ export const PROJECTS: RegisterDef = {
     text("name", "Project Name", { required: true }),
     text("client", "Client"),
     text("jobNo", "Job No."),
+    text("projectNumber", "Project Number", { hint: "The number of the project in the Resource Planner. Unique. It links the two applications." }),
     sel("currentDesignStage", "Current Design Stage", "designStage"),
     sel("status", "Project Status", "projectStatus", { strict: true, required: true }),
     sel("gisLead", "GIS Lead", "gisLead"),
