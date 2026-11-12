@@ -3,7 +3,7 @@ import { requireActor } from "@/application/auth/actor";
 import { listAll } from "@/application/hub/lists";
 import { LIST_KEYS, LIST_KEY_VALUES } from "@/domain/shared/enums";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
-import { ConfirmSubmit } from "@/components/ui/confirm-submit";
+import { DeleteControl } from "@/components/ui/delete-control";
 import { ActionForm, FormMessage, SubmitButton } from "@/components/ui/form";
 import { Checkbox, Input } from "@/components/ui/input";
 import { PageHeader } from "@/components/ui/page-header";
@@ -31,8 +31,8 @@ export default async function ListsPage() {
               <CardBody className="space-y-2">
                 <ul className="divide-border divide-y text-sm">
                   {lists[key].map((item) => (
-                    <li key={item.id} className="py-1.5">
-                      <ActionForm action={updateListValueAction} className="flex flex-wrap items-center gap-2">
+                    <li key={item.id} className="flex items-start gap-2 py-1.5">
+                      <ActionForm action={updateListValueAction} className="flex flex-1 flex-wrap items-center gap-2 space-y-0">
                         <input type="hidden" name="id" value={item.id} />
                         <span className="w-6 text-xs text-gray-400">{item.sortOrder}</span>
                         <Input name="value" defaultValue={item.value} className="h-8 w-64 text-xs" aria-label="Value" />
@@ -45,11 +45,10 @@ export default async function ListsPage() {
                         </SubmitButton>
                         <FormMessage />
                       </ActionForm>
-                      <ActionForm action={deleteListValueAction} className="mt-1 inline">
+                      <ActionForm action={deleteListValueAction} className="space-y-1">
                         <input type="hidden" name="id" value={item.id} />
-                        <ConfirmSubmit size="sm" variant="ghost" title="Delete value?" description={`"${item.value}" will no longer appear in dropdowns. Rows that already use it keep the text.`} confirmLabel="Delete">
-                          Delete
-                        </ConfirmSubmit>
+                        <DeleteControl mode="icon" name={`"${item.value}"`} usedBy={item.usedBy} description="It will no longer appear in dropdowns." />
+                        <FormMessage />
                       </ActionForm>
                     </li>
                   ))}

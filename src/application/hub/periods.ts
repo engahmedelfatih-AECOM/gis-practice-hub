@@ -12,6 +12,8 @@ import { notFound, validation } from "@/application/errors";
 import { assertCan, parseInput } from "@/application/shared/guard";
 import { withTx } from "@/application/shared/service";
 import { getSetting } from "@/application/settings/settings";
+import { deleteIfUnused, usageOf, type Usage } from "@/application/shared/usage";
+import { PERIOD_DELETE_RULE } from "./delete-rules";
 
 export interface PeriodView {
   id: string;
@@ -140,13 +142,20 @@ export async function updatePeriod(actor: Actor, raw: unknown): Promise<void> {
   });
 }
 
+/** Delete a report period added by mistake: only while no update falls in it and it is not the current period. */
 export async function deletePeriod(actor: Actor, rawId: unknown): Promise<void> {
   assertCan(actor, "period:manage");
   const id = parseInput(uuidSchema, rawId);
   await withTx(async (tx) => {
-    const [before] = await tx.select().from(reportPeriod).where(eq(reportPeriod.id, id));
-    if (!before) throw notFound("Report period");
-    await tx.delete(reportPeriod).where(eq(reportPeriod.id, id));
+    const [target] = await tx.select().from(reportPeriod).where(eq(reportPeriod.id, id));
+    if (!target) throw notFound("Report period");
+    const before = await deleteIfUnused(tx, PERIOD_DELETE_RULE, id, `The period ${periodLabel(target.startDate, target.endDate)}`);
     await writeAudit(tx, actor, { action: "period.delete", entityType: "report_period", entityId: id, before });
   });
+}
+
+/** Usage of report periods for their Delete controls. */
+export async function periodUsage(actor: Actor, periods: PeriodView[]): Promise<Map<string, Usage>> {
+  assertCan(actor, "period:manage");
+  return usageOf(db, PERIOD_DELETE_RULE, periods);
 }

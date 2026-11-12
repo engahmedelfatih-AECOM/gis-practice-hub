@@ -1,14 +1,14 @@
 import type { Metadata } from "next";
 import { requireActor } from "@/application/auth/actor";
-import { currentPeriodSetting, listPeriods } from "@/application/hub/periods";
+import { currentPeriodSetting, listPeriods, periodUsage } from "@/application/hub/periods";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { ConfirmSubmit } from "@/components/ui/confirm-submit";
+import { DeleteControl } from "@/components/ui/delete-control";
 import { Badge } from "@/components/ui/badge";
 import { ActionForm, FormMessage, SubmitButton } from "@/components/ui/form";
 import { Input, Label } from "@/components/ui/input";
 import { PageHeader } from "@/components/ui/page-header";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
-import { formatDate } from "@/lib/format";
 import { guarded } from "@/app/_lib/page-guard";
 import { addPeriodAction, deletePeriodAction, regeneratePeriodsAction, setCurrentPeriodAction, updatePeriodAction } from "./actions";
 
@@ -17,8 +17,9 @@ export const metadata: Metadata = { title: "Report periods" };
 /** The bi-weekly calendar (Lists sheet columns R to T): first start date, every period follows on. */
 export default async function PeriodsPage() {
   return guarded(async () => {
-    await requireActor();
+    const actor = await requireActor();
     const [periods, current] = await Promise.all([listPeriods(), currentPeriodSetting()]);
+    const usage = await periodUsage(actor, periods);
     return (
       <>
         <PageHeader
@@ -140,11 +141,10 @@ export default async function PeriodsPage() {
                       </SubmitButton>
                     </ActionForm>
                   )}
-                  <ActionForm action={deletePeriodAction} className="inline">
+                  <ActionForm action={deletePeriodAction} className="inline-block space-y-1 align-middle">
                     <input type="hidden" name="id" value={p.id} />
-                    <ConfirmSubmit size="sm" variant="ghost" title="Delete period?" description={`${formatDate(p.startDate)} to ${formatDate(p.endDate)} will be removed from the calendar.`} confirmLabel="Delete">
-                      Delete
-                    </ConfirmSubmit>
+                    <DeleteControl mode="icon" name={`the period ${p.label}`} usedBy={usage.get(p.id)?.note ?? null} description="It will be removed from the calendar." />
+                    <FormMessage />
                   </ActionForm>
                 </TD>
               </TR>

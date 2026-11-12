@@ -11,6 +11,8 @@ import { writeAudit } from "@/application/audit/audit";
 import { notFound } from "@/application/errors";
 import { assertCan, parseInput } from "@/application/shared/guard";
 import { withTx } from "@/application/shared/service";
+import { deleteIfUnused, usageOf } from "@/application/shared/usage";
+import { LIST_DELETE_RULE } from "./delete-rules";
 
 export interface ListValue {
   id: string;
@@ -37,13 +39,25 @@ export interface ListAdminRow extends ListValue {
   listKey: ListKey;
   sortOrder: number;
   isActive: boolean;
+  /** "Used by 4 packages. Deactivate it instead." or null when the value may be deleted. */
+  usedBy: string | null;
 }
 
 export async function listAll(actor: Actor): Promise<Record<ListKey, ListAdminRow[]>> {
   assertCan(actor, "list:manage");
   const rows = await db.select().from(listItem).orderBy(asc(listItem.listKey), asc(listItem.sortOrder), asc(listItem.value));
   const out = Object.fromEntries(LIST_KEY_VALUES.map((k) => [k, [] as ListAdminRow[]])) as Record<ListKey, ListAdminRow[]>;
-  for (const r of rows) out[r.listKey as ListKey]?.push({ id: r.id, value: r.value, group: r.group, listKey: r.listKey as ListKey, sortOrder: r.sortOrder, isActive: r.isActive });
+  const usage = await usageOf(db, LIST_DELETE_RULE, rows);
+  for (const r of rows)
+    out[r.listKey as ListKey]?.push({
+      id: r.id,
+      value: r.value,
+      group: r.group,
+      listKey: r.listKey as ListKey,
+      sortOrder: r.sortOrder,
+      isActive: r.isActive,
+      usedBy: usage.get(r.id)?.note ?? null,
+    });
   return out;
 }
 
@@ -85,13 +99,14 @@ export async function updateListValue(actor: Actor, raw: unknown): Promise<void>
   });
 }
 
+/** Delete a list value added by mistake: only while no row, scope or tracker uses it (decision 2026-11-12). */
 export async function deleteListValue(actor: Actor, rawId: unknown): Promise<void> {
   assertCan(actor, "list:manage");
   const id = parseInput(uuidSchema, rawId);
   await withTx(async (tx) => {
-    const [before] = await tx.select().from(listItem).where(eq(listItem.id, id));
-    if (!before) throw notFound("List value");
-    await tx.delete(listItem).where(eq(listItem.id, id));
+    const [target] = await tx.select({ value: listItem.value }).from(listItem).where(eq(listItem.id, id));
+    if (!target) throw notFound("List value");
+    const before = await deleteIfUnused(tx, LIST_DELETE_RULE, id, `"${target.value}"`);
     await writeAudit(tx, actor, { action: "list.delete", entityType: "list_item", entityId: id, before });
   });
 }

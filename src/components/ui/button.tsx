@@ -11,7 +11,8 @@ export const buttonVariants = cva(
         primary: "bg-brand-primary text-brand-white hover:bg-brand-primary-hover",
         secondary: "border border-border bg-surface text-foreground hover:bg-gray-100",
         accent: "bg-midnight-teal text-brand-white hover:bg-midnight-teal-75",
-        danger: "bg-brand-red text-brand-white hover:bg-brand-red-deep",
+        // Deep coral: white text on it meets WCAG AA (the 100 % coral does not).
+        danger: "bg-brand-red-deep text-brand-white hover:brightness-90",
         ghost: "text-foreground hover:bg-gray-100",
         link: "text-brand-link underline-offset-4 hover:underline",
       },

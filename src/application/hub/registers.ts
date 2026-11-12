@@ -35,6 +35,8 @@ import { writeAudit } from "@/application/audit/audit";
 import { forbidden, notFound, validation } from "@/application/errors";
 import { assertCan, parseInput } from "@/application/shared/guard";
 import { updateVersioned, withTx } from "@/application/shared/service";
+import { deleteIfUnused, usageOf, type Usage } from "@/application/shared/usage";
+import { registerDeleteRule } from "./delete-rules";
 import { listValues } from "./lists";
 
 type RegisterTable = PgTable & {
@@ -296,6 +298,12 @@ export async function updateRow(actor: Actor, key: RegisterKey, raw: unknown): P
   });
 }
 
+/**
+ * Delete a row created by mistake (decision 2026-11-12). Allowed for the roles that may add the row
+ * (the register's manage permission; Packages: plan), inside their region scope, and only while
+ * nothing uses the row: the usage is checked again here with the row locked. A project takes its
+ * update page parts (workflow steps, enterprise applications) with it.
+ */
 export async function deleteRow(actor: Actor, key: RegisterKey, rawId: unknown): Promise<void> {
   const def = REGISTERS[key];
   const id = parseInput(uuidSchema, rawId);
@@ -305,11 +313,20 @@ export async function deleteRow(actor: Actor, key: RegisterKey, rawId: unknown):
   const delProjectId = key === "projects" ? (target as RegisterRow).id : (target as RegisterRow).projectId;
   if ((await assertManage(actor, def, delProjectId)) === "progress") throw forbidden(`delete rows of ${def.label}`);
   await withTx(async (tx) => {
-    const [existing] = await tx.select().from(table).where(eq(table.id, id)).limit(1);
-    if (!existing) throw notFound(def.label);
-    await tx.delete(table).where(eq(table.id, id));
-    await writeAudit(tx, actor, { action: `${ENTITY_TYPE[key]}.delete`, entityType: ENTITY_TYPE[key], entityId: id, before: existing });
+    const name = String((target as Record<string, unknown>)[def.nameField] ?? "This row");
+    const before = await deleteIfUnused(tx, registerDeleteRule(key), id, name);
+    await writeAudit(tx, actor, { action: `${ENTITY_TYPE[key]}.delete`, entityType: ENTITY_TYPE[key], entityId: id, before });
   });
+}
+
+/**
+ * Usage of register rows for the Delete controls, or null when the actor may not delete rows of
+ * this register at all (the screens then show no control).
+ */
+export async function rowUsage(actor: Actor, key: RegisterKey, rows: Record<string, unknown>[]): Promise<Map<string, Usage> | null> {
+  const def = REGISTERS[key];
+  if (!can(actor, def.plan ?? def.manage)) return null;
+  return usageOf(db, registerDeleteRule(key), rows);
 }
 
 /** Every new project gets the default AECOM delivery workflow (editable on its update page). */
