@@ -57,6 +57,8 @@ describe("contrast of the status colours (WCAG AA, proposal 12)", () => {
     expect(contrast(resolve("--color-brand-primary"), white)).toBeGreaterThanOrEqual(AA);
     expect(contrast(resolve("--color-brand-primary-hover"), white)).toBeGreaterThanOrEqual(AA);
     expect(contrast(resolve("--color-midnight-teal"), white)).toBeGreaterThanOrEqual(AA);
+    // Danger buttons (Delete) use the deep coral, so their white text meets AA.
+    expect(contrast(resolve("--color-brand-red-deep"), white)).toBeGreaterThanOrEqual(AA);
     for (const surface of ["--color-surface", "--color-surface-muted"]) {
       expect(contrast(resolve(surface), resolve("--color-brand-link"))).toBeGreaterThanOrEqual(AA);
       expect(contrast(resolve(surface), resolve("--color-gray-500"))).toBeGreaterThanOrEqual(AA);

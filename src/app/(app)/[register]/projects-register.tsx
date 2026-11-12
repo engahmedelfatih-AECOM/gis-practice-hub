@@ -8,6 +8,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { PeriodSelect } from "@/components/hub/period-select";
 import { RowKeys, RowKeysHint } from "@/components/hub/row-keys";
 import { toneClass } from "@/components/hub/tones";
+import { DeleteRowForm } from "./delete-row-form";
 import { cn } from "@/lib/cn";
 import { formatDate } from "@/lib/format";
 
@@ -16,12 +17,17 @@ export function ProjectsRegister({
   view,
   canAdd,
   saved,
+  deleted = false,
   exportHref,
+  deleteNotes = null,
 }: {
   view: { rows: ProjectView[]; period: PeriodView | null; periods: PeriodView[] };
   canAdd: boolean;
   saved: boolean;
+  deleted?: boolean;
   exportHref: string;
+  /** Usage note per project id for the bin icon; null when this role may not delete projects. */
+  deleteNotes?: Record<string, string | null> | null;
 }) {
   const th = (label: string, dark = false) => (
     <th key={label} className={cn("px-2 py-2 font-semibold whitespace-nowrap", dark ? "bg-midnight-teal" : "bg-earth-green")}>
@@ -50,6 +56,7 @@ export function ProjectsRegister({
         }
       />
       {saved ? <Alert tone="ok" className="mb-4">Project saved.</Alert> : null}
+      {deleted ? <Alert tone="ok" className="mb-4">Project deleted.</Alert> : null}
       <RowKeys className="sheet-scroll border-border bg-surface w-full rounded-lg border">
         <table className="sheet-table w-full text-left text-xs">
           <thead className="text-white">
@@ -84,6 +91,11 @@ export function ProjectsRegister({
               {th("Remarks")}
               {th("Share Folder")}
               {th("Update page", true)}
+              {deleteNotes ? (
+                <th className="bg-earth-green px-2 py-2">
+                  <span className="sr-only">Delete</span>
+                </th>
+              ) : null}
             </tr>
           </thead>
           <tbody className="divide-border divide-y">
@@ -133,6 +145,11 @@ export function ProjectsRegister({
                     Open report
                   </Link>
                 </td>
+                {deleteNotes ? (
+                  <td className="px-1 py-1 whitespace-nowrap">
+                    <DeleteRowForm register="projects" id={p.id} name={p.name} usedBy={deleteNotes[p.id] ?? null} />
+                  </td>
+                ) : null}
               </tr>
             ))}
             {view.rows.length === 0 ? (

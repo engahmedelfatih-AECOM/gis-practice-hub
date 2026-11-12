@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 import type { FieldDef } from "@/domain/hub/registers";
 import { cn } from "@/lib/cn";
 import { formatDate } from "@/lib/format";
@@ -31,6 +32,7 @@ export function RegisterTable({
   editHref,
   rowLabel,
   startNumber = 1,
+  deleteCell,
 }: {
   fields: FieldDef[];
   rows: Record<string, unknown>[];
@@ -39,6 +41,8 @@ export function RegisterTable({
   rowLabel?: (row: Record<string, unknown>) => string;
   /** Number of the first row on this page, so "#" keeps counting across pages. */
   startNumber?: number;
+  /** Bin icon at the end of each row, for the roles that may delete rows. */
+  deleteCell?: (row: Record<string, unknown>) => ReactNode;
 }) {
   // Calculated columns are shown once, as extras, not as an empty stored column.
   const columns = fields.filter((f) => !f.derived);
@@ -60,6 +64,11 @@ export function RegisterTable({
               </th>
             ))}
             <th className="px-2 py-2" />
+            {deleteCell ? (
+              <th className="px-2 py-2">
+                <span className="sr-only">Delete</span>
+              </th>
+            ) : null}
           </tr>
         </thead>
         <tbody className="divide-border divide-y">
@@ -97,11 +106,12 @@ export function RegisterTable({
                   Edit
                 </Link>
               </td>
+              {deleteCell ? <td className="px-1 py-1 whitespace-nowrap">{deleteCell(row)}</td> : null}
             </tr>
           ))}
           {rows.length === 0 ? (
             <tr>
-              <td colSpan={fields.length + extras.length + 2} className="px-4 py-8 text-center text-sm text-gray-500">
+              <td colSpan={fields.length + extras.length + 3} className="px-4 py-8 text-center text-sm text-gray-500">
                 No rows yet.
               </td>
             </tr>

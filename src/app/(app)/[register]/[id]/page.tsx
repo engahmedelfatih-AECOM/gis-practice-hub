@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
 import { requireActor } from "@/application/auth/actor";
 import { historyFor } from "@/application/audit/read";
-import { ENTITY_TYPE, editableFields, formSources, getRow } from "@/application/hub/registers";
+import { ENTITY_TYPE, editableFields, formSources, getRow, rowUsage } from "@/application/hub/registers";
 import { can } from "@/domain/authz/policy";
-import { Card, CardBody, CardHeader } from "@/components/ui/card";
-import { ConfirmSubmit } from "@/components/ui/confirm-submit";
-import { ActionForm } from "@/components/ui/form";
+import { Card, CardBody } from "@/components/ui/card";
+import { DeleteControl } from "@/components/ui/delete-control";
+import { ActionForm, FormMessage } from "@/components/ui/form";
 import { PageHeader } from "@/components/ui/page-header";
 import { RegisterForm } from "@/components/hub/register-form";
 import { HistoryPanel } from "@/app/(app)/_components/history-panel";
@@ -32,8 +32,19 @@ export async function EditRowBody({ def, id }: { def: RegisterDef; id: string })
     const [row, sources, history] = await Promise.all([getRow(actor, def.key, id), formSources(def), can(actor, "audit:read") ? historyFor(ENTITY_TYPE[def.key], id) : Promise.resolve([])]);
     const { fields, readOnly, options } = editableFields(actor, def);
     const canEdit = can(actor, def.manage) || (def.plan ? can(actor, def.plan) : false);
-    const canDelete = can(actor, def.plan ?? def.manage);
+    // Delete: the roles that may add the row (decision 2026-11-12); null when this actor may not.
+    const usage = (await rowUsage(actor, def.key, [row]))?.get(row.id) ?? null;
     const name = String(row[def.nameField] ?? def.label);
+    const deleteFormId = `delete-${row.id}`;
+    const deleteControl = usage ? (
+      <DeleteControl
+        mode="button"
+        name={name}
+        usedBy={usage.note}
+        formId={deleteFormId}
+        description="GIS-STD-001 keeps history: delete only a row entered by mistake."
+      />
+    ) : null;
     return (
       <>
         <PageHeader title={name} description={row.projectName ? `Project: ${row.projectName}` : undefined} crumbs={[{ label: "Registers" }, { label: def.label, href: def.path }, { label: name }]} />
@@ -52,25 +63,19 @@ export async function EditRowBody({ def, id }: { def: RegisterDef; id: string })
                     hidden={{ __register: def.key, id: row.id, version: String(row.version) }}
                     submitLabel="Save"
                     cancelHref={def.key === "projects" ? `/projects/${row.id}` : def.path}
+                    extraActions={deleteControl}
                   />
                 ) : (
                   <RegisterForm action={updateRowAction} fields={fields} values={row} sources={sources} readOnly={new Set(fields.map((f) => f.key))} hidden={{ __register: def.key, id: row.id, version: String(row.version) }} submitLabel="Read only" cancelHref={def.path} />
                 )}
               </CardBody>
             </Card>
-            {canDelete ? (
-              <Card>
-                <CardHeader title="Remove this row" description="The working standard says never delete history: set a status instead. Delete only a row entered by mistake." />
-                <CardBody>
-                  <ActionForm action={deleteRowAction}>
-                    <input type="hidden" name="__register" value={def.key} />
-                    <input type="hidden" name="id" value={row.id} />
-                    <ConfirmSubmit title="Delete row?" description={`${name} will be removed from ${def.label}. The audit log keeps a copy.`} confirmLabel="Delete">
-                      Delete row
-                    </ConfirmSubmit>
-                  </ActionForm>
-                </CardBody>
-              </Card>
+            {usage ? (
+              <ActionForm id={deleteFormId} action={deleteRowAction}>
+                <input type="hidden" name="__register" value={def.key} />
+                <input type="hidden" name="id" value={row.id} />
+                <FormMessage />
+              </ActionForm>
             ) : null}
           </div>
           <HistoryPanel rows={history} />

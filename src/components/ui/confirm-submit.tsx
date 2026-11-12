@@ -6,7 +6,7 @@ import { Button } from "./button";
 
 /**
  * A submit button that asks for confirmation first (plan §12: confirm before
- * destructive or consequential actions). Place inside a <form>.
+ * destructive or consequential actions). Place inside a <form>, or name the form with `formId`.
  */
 export function ConfirmSubmit({
   title,
@@ -14,8 +14,15 @@ export function ConfirmSubmit({
   confirmLabel = "Confirm",
   children,
   variant = "danger",
+  formId,
   ...props
-}: ComponentProps<typeof Button> & { title: string; description: string; confirmLabel?: string }) {
+}: ComponentProps<typeof Button> & {
+  title: string;
+  description: string;
+  confirmLabel?: string;
+  /** Submit this form (by id) instead of the enclosing one, for a button that sits inside another form. */
+  formId?: string;
+}) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLButtonElement>(null);
   return (
@@ -23,7 +30,7 @@ export function ConfirmSubmit({
       <Button type="button" variant={variant} onClick={() => setOpen(true)} {...props}>
         {children}
       </Button>
-      <button ref={ref} type="submit" className="hidden" aria-hidden tabIndex={-1} />
+      <button ref={ref} type="submit" form={formId} className="hidden" aria-hidden tabIndex={-1} />
       <AlertDialog.Root open={open} onOpenChange={setOpen}>
         <AlertDialog.Portal>
           <AlertDialog.Overlay className="fixed inset-0 z-40 bg-black/40" />
@@ -38,7 +45,7 @@ export function ConfirmSubmit({
               </AlertDialog.Cancel>
               <AlertDialog.Action asChild>
                 <Button
-                  variant={variant}
+                  variant={variant === "ghost" ? "danger" : variant}
                   onClick={() => {
                     setOpen(false);
                     ref.current?.form?.requestSubmit();

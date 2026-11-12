@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { requireActor } from "@/application/auth/actor";
-import { PAGE_SIZE, countRows, listRows } from "@/application/hub/registers";
+import { PAGE_SIZE, countRows, listRows, rowUsage } from "@/application/hub/registers";
 import { listProjectsBrief } from "@/application/hub/project-extras";
 import { projectsView, registerExtras } from "@/application/hub/views";
 import { can } from "@/domain/authz/policy";
@@ -14,6 +14,7 @@ import { guarded } from "@/app/_lib/page-guard";
 import { param, type Params, type SearchParams } from "@/app/_lib/actions";
 import { registerFromSegment } from "./_lib";
 import { ProjectsRegister } from "./projects-register";
+import { DeleteRowForm } from "./delete-row-form";
 
 export async function generateMetadata({ params }: { params: Params<{ register: string }> }): Promise<Metadata> {
   const { register } = await params;
@@ -34,7 +35,18 @@ export default async function RegisterPage({ params, searchParams }: { params: P
 
     if (def.key === "projects") {
       const view = await projectsView(actor, param(sp, "period"));
-      return <ProjectsRegister view={view} canAdd={canAdd} saved={Boolean(param(sp, "saved"))} exportHref={exportHref} />;
+      const usage = await rowUsage(actor, "projects", view.rows as unknown as Record<string, unknown>[]);
+      const deleteNotes = usage ? Object.fromEntries([...usage].map(([id, u]) => [id, u.note])) : null;
+      return (
+        <ProjectsRegister
+          view={view}
+          canAdd={canAdd}
+          saved={Boolean(param(sp, "saved"))}
+          deleted={Boolean(param(sp, "deleted"))}
+          exportHref={exportHref}
+          deleteNotes={deleteNotes}
+        />
+      );
     }
 
     // One page at a time: the registers can hold thousands of rows after an import.
@@ -60,6 +72,7 @@ export default async function RegisterPage({ params, searchParams }: { params: P
       ? Object.keys(extraFn(rows[0] ?? {})).map((label) => ({ label, value: (row) => extraFn(row)[label as never] as string }))
       : [];
     const hasProject = def.fields.some((f) => f.type === "project");
+    const usage = await rowUsage(actor, def.key, rows);
     return (
       <>
         <PageHeader
@@ -114,6 +127,11 @@ export default async function RegisterPage({ params, searchParams }: { params: P
           editHref={(row) => `${def.path}/${row.id}`}
           rowLabel={(row) => String(row[def.nameField] ?? "")}
           startNumber={(page - 1) * PAGE_SIZE + 1}
+          deleteCell={
+            usage
+              ? (row) => <DeleteRowForm register={def.key} id={String(row.id)} name={String(row[def.nameField] ?? "Row")} usedBy={usage.get(String(row.id))?.note ?? null} />
+              : undefined
+          }
         />
         {pages > 1 ? (
           <nav className="mt-4 flex items-center gap-2 text-sm" aria-label="Pages">

@@ -196,3 +196,45 @@ test.describe("Role walk-through on the sample workbook", () => {
     await expect(page.getByRole("cell", { name: "QIC Delta B (D10)" })).toBeVisible();
   });
 });
+
+test.describe("Delete a record created by mistake (decision 2026-11-12)", () => {
+  async function insertRisk(title: string): Promise<string> {
+    const sql = postgres(process.env.DATABASE_URL!, { max: 1, onnotice: () => undefined });
+    try {
+      const [row] = await sql<{ id: string }[]>`insert into risk (title, status) values (${title}, 'Open') returning id`;
+      return row!.id;
+    } finally {
+      await sql.end();
+    }
+  }
+
+  test("the GIS Lead deletes risks typed by mistake, from the row bin and from the edit page", async ({ page }) => {
+    await insertRisk("E2E bin risk");
+    const editId = await insertRisk("E2E edit risk");
+    await signIn(page, ACCOUNTS.lead);
+
+    await page.goto("/risks?q=E2E%20bin");
+    await page.getByRole("button", { name: "Delete E2E bin risk" }).click();
+    await expect(page.getByRole("alertdialog")).toContainText("audit log keeps a copy");
+    await page.getByRole("alertdialog").getByRole("button", { name: "Delete" }).click();
+    await expect(page.getByText("Row deleted.")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Delete E2E bin risk" })).toHaveCount(0);
+
+    await page.goto(`/risks/${editId}`);
+    await expect(page.getByRole("button", { name: "Save" })).toBeVisible();
+    await page.getByRole("button", { name: "Delete", exact: true }).click();
+    await page.getByRole("alertdialog").getByRole("button", { name: "Delete" }).click();
+    await expect(page.getByText("Row deleted.")).toBeVisible();
+  });
+
+  test("a project in use shows a greyed bin that says why, and the Viewer gets no bin", async ({ page }) => {
+    await signIn(page, ACCOUNTS.manager);
+    await page.goto("/projects");
+    const blocked = page.getByRole("button", { name: /^Cannot delete Laheq Island\. Used by .+ Set its Project Status instead\.$/ });
+    await expect(blocked).toHaveAttribute("aria-disabled", "true");
+
+    await signIn(page, ACCOUNTS.viewer);
+    await page.goto("/risks");
+    await expect(page.getByRole("button", { name: /^Delete / })).toHaveCount(0);
+  });
+});

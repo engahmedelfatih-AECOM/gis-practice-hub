@@ -34,6 +34,7 @@ export function RegisterForm({
   submitLabel,
   cancelHref,
   columns = 3,
+  extraActions,
 }: {
   action: Action;
   fields: FieldDef[];
@@ -46,6 +47,8 @@ export function RegisterForm({
   submitLabel: string;
   cancelHref: string;
   columns?: 2 | 3;
+  /** More controls after Save and Cancel, such as Delete (bound to its own form by id). */
+  extraActions?: React.ReactNode;
 }) {
   return (
     <ActionForm action={action}>
@@ -85,11 +88,12 @@ export function RegisterForm({
             </Field>
           ))}
       </div>
-      <div className="flex gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <SubmitButton pendingText="Saving...">{submitLabel}</SubmitButton>
         <ButtonLink href={cancelHref} variant="secondary">
           Cancel
         </ButtonLink>
+        {extraActions ? <span className="ml-auto">{extraActions}</span> : null}
       </div>
     </ActionForm>
   );
